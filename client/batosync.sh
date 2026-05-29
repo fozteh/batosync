@@ -18,7 +18,7 @@
 
 set -euo pipefail
 
-VERSION="2.0.0 (2026-05-29)"
+VERSION="2.1.0 (2026-05-29)"
 
 # ── Load config from first location found ─────────────────────────
 for _conf in \
@@ -295,20 +295,11 @@ print(saves[0]['checksum'] if saves else '')
         done)
 
         if [[ -n "$local_file" ]]; then
-            local_cs=$(checksum "$local_file")
-            if [[ "$local_cs" == "$server_cs" ]]; then
-                info "  = $game_name already up to date"
-                ((skipped++)) || true
-                continue
-            fi
-            if [[ "$DRY_RUN" == "true" ]]; then
-                info "  [DRY-RUN] Would update: $game_name"
-                continue
-            fi
-            cp "$local_file" "${local_file}.batosync_backup"
-            info "  ↓ Downloading newer save for $game_name..."
-            api GET "/saves/${encoded_game}/latest" -o "$local_file" 2>/dev/null
-            success "  ✓ $game_name updated"
+            # Never overwrite an existing local save — push handles syncing progress
+            # back to the server; pull only brings down games new to this device
+            info "  = $game_name exists locally — skipping (push to update server)"
+            ((skipped++)) || true
+            continue
         else
             if [[ "$DRY_RUN" == "true" ]]; then
                 info "  [DRY-RUN] Would download new: $game_name"
