@@ -24,7 +24,7 @@ VERSION="2.0.0 (2026-05-29)"
 for _conf in \
     "/userdata/system/batosync.conf" \
     "/mnt/mmc/MUOS/batosync.conf" \
-    "$(dirname "$(realpath "$0")")/batosync.conf" \
+    "$(dirname "$0")/batosync.conf" \
     "$HOME/batosync.conf"; do
     [[ -f "$_conf" ]] && source "$_conf" && break
 done
