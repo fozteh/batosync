@@ -18,7 +18,7 @@
 
 set -euo pipefail
 
-VERSION="2.4.0 (2026-05-29)"
+VERSION="2.5.0 (2026-05-29)"
 
 # ── Load config from first location found ─────────────────────────
 for _conf in \
@@ -296,13 +296,25 @@ print(saves[0]['checksum'] if saves else '')
 
         [[ -z "$server_cs" ]] && continue
 
-        local_file=$(find_saves | while IFS= read -r f; do
-            rel="${f#$SAVES_DIR/}"
-            gdir=$(dirname "$rel")
-            gfname=$(basename "$f")
-            gname="${gdir//\//_}_${gfname%.*}"
-            [[ "$gname" == "$game_name" ]] && echo "$f" && break
-        done)
+        # Prefer exact original_path lookup — faster and avoids false matches
+        orig_path_check=$(echo "$save_info" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+saves = data.get('saves', [])
+print(saves[0].get('original_path','') if saves else '')
+" 2>/dev/null)
+
+        if [[ -n "$orig_path_check" && -f "${SAVES_DIR}/${orig_path_check}" ]]; then
+            local_file="${SAVES_DIR}/${orig_path_check}"
+        else
+            local_file=$(find_saves | while IFS= read -r f; do
+                rel="${f#$SAVES_DIR/}"
+                gdir=$(dirname "$rel")
+                gfname=$(basename "$f")
+                gname="${gdir//\//_}_${gfname%.*}"
+                [[ "$gname" == "$game_name" ]] && echo "$f" && break
+            done)
+        fi
 
         if [[ -n "$local_file" ]]; then
             local_cs=$(checksum "$local_file")
