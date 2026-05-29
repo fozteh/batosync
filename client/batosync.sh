@@ -18,7 +18,7 @@
 
 set -euo pipefail
 
-VERSION="2.2.0 (2026-05-29)"
+VERSION="2.3.0 (2026-05-29)"
 
 # ── Load config from first location found ─────────────────────────
 for _conf in \
@@ -115,9 +115,12 @@ is_excluded() {
 }
 
 # Shared find pipeline for save files
+# grep exits 1 when no files match the filter (e.g. fresh device with only .txt files)
+# || true prevents set -euo pipefail from killing the script in that case
 find_saves() {
     find "$SAVES_DIR" -type f ! -name "*.batosync_backup" \
-        | grep -viE '\.(png|jpg|jpeg|gif|bmp|webp|tif|tiff|svg|mp4|mkv|avi|mov|mp3|ogg|flac|wav|xml|txt|nfo|pdf)$'
+        | grep -viE '\.(png|jpg|jpeg|gif|bmp|webp|tif|tiff|svg|mp4|mkv|avi|mov|mp3|ogg|flac|wav|xml|txt|nfo|pdf)$' \
+        || true
 }
 
 # Check server is reachable
