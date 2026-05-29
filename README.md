@@ -2,6 +2,8 @@
 
 Keep your save files in sync across multiple Batocera devices automatically.
 
+![BatoSync Dashboard](screenshot.png)
+
 BatoSync runs as a small Docker container on any machine in your home network (a NAS, an old PC, a Raspberry Pi, etc.). Each Batocera device runs a single script to push its saves up and pull down the latest version before you play.
 
 ---
