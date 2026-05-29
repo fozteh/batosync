@@ -18,7 +18,7 @@
 
 set -euo pipefail
 
-VERSION="2.7.0 (2026-05-29)"
+VERSION="2.8.0 (2026-05-29)"
 
 # ── Load config from first location found ─────────────────────────
 for _conf in \
@@ -275,6 +275,7 @@ for g in games:
         return
     fi
 
+    set +e  # disable exit-on-error for individual game failures
     while IFS= read -r game_name; do
         [[ -z "$game_name" ]] && continue
 
@@ -367,6 +368,7 @@ print(saves[0].get('original_filename','save.srm') if saves else 'save.srm')
 
     done <<< "$games"
 
+    set -e  # restore exit-on-error
     success "Pull complete — downloaded: $pulled, already current: $skipped"
 }
 
