@@ -182,6 +182,7 @@ def upload_save(game_name):
 
     device = request.form.get("device", "unknown")
     client_saved_at = request.form.get("saved_at", datetime.utcnow().isoformat())
+    original_path = request.form.get("original_path", "")
 
     uploaded = request.files["file"]
     if uploaded.filename == "":
@@ -215,6 +216,7 @@ def upload_save(game_name):
     new_save = {
         "filename": stored_filename,
         "original_filename": original_filename,
+        "original_path": original_path,
         "filepath": stored_path,
         "device": device,
         "saved_at": client_saved_at,

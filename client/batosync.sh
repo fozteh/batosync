@@ -18,7 +18,7 @@
 
 set -euo pipefail
 
-VERSION="2.3.0 (2026-05-29)"
+VERSION="2.4.0 (2026-05-29)"
 
 # ── Load config from first location found ─────────────────────────
 for _conf in \
@@ -237,6 +237,7 @@ print(s['device'] if s else '')
             -F "file=@\"${local_file}\"" \
             -F "device=${DEVICE_NAME}" \
             -F "saved_at=${file_mtime}" \
+            -F "original_path=${rel}" \
             2>/dev/null) || result='{"status":"error","message":"curl failed"}'
 
         status=$(echo "$result" | python3 -c "import json,sys; print(json.load(sys.stdin).get('status','error'))" 2>/dev/null || echo 'error')
@@ -323,16 +324,29 @@ print(saves[0]['checksum'] if saves else '')
                 info "  [DRY-RUN] Would download new: $game_name"
                 continue
             fi
+            orig_path=$(echo "$save_info" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+saves = data.get('saves', [])
+print(saves[0].get('original_path','') if saves else '')
+" 2>/dev/null)
             orig_fname=$(echo "$save_info" | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
 saves = data.get('saves', [])
 print(saves[0].get('original_filename','save.srm') if saves else 'save.srm')
 " 2>/dev/null)
-            reconstructed=$(echo "$game_name" | tr '_' '/')
-            dest_dir="${SAVES_DIR}/$(dirname "$reconstructed")"
+            if [[ -n "$orig_path" ]]; then
+                # Use exact original path recorded at push time
+                dest_file="${SAVES_DIR}/${orig_path}"
+            else
+                # Fallback for saves pushed before original_path was recorded:
+                # use system dir + original filename
+                system_dir="${game_name%%_*}"
+                dest_file="${SAVES_DIR}/${system_dir}/${orig_fname}"
+            fi
+            dest_dir="$(dirname "$dest_file")"
             mkdir -p "$dest_dir"
-            dest_file="${dest_dir}/$(basename "$reconstructed").${orig_fname##*.}"
             info "  ↓ Downloading $game_name to $dest_file..."
             api GET "/saves/${encoded_game}/latest" -o "$dest_file" 2>/dev/null || { error "  ✗ Failed to download $game_name"; continue; }
             success "  ✓ $game_name downloaded (new on this device)"
