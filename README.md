@@ -49,7 +49,7 @@ Open `docker-compose.yml` and change the `API_KEY` value:
 ```yaml
 environment:
   - API_KEY=change_me_to_a_secret_passphrase   # ← change this
-  - MAX_BACKUPS=3                # keep last 3 saves per game
+  - MAX_BACKUPS=20               # keep last 20 saves per game
 ```
 
 Pick any passphrase. Write it down — you'll need it on each Batocera device.
@@ -260,7 +260,7 @@ Logs are written on each Batocera device at:
 | "Unauthorized" | The `API_KEY` in `batosync.conf` doesn't match `docker-compose.yml` |
 | Saves not appearing | Check `/userdata/saves/` contains `.srm`, `.sav`, or `.state` files |
 | Duplicate syncs | Normal — the script detects identical checksums and skips them |
-| Want more backups | Change `MAX_BACKUPS=3` to `5` in `docker-compose.yml` and restart |
+| Want more/fewer backups | Change `MAX_BACKUPS=20` in `docker-compose.yml` and restart |
 
 ---
 
