@@ -18,7 +18,7 @@
 
 set -euo pipefail
 
-VERSION="2.8.0 (2026-05-29)"
+VERSION="3.0.0 (2026-05-29)"
 
 # ── Load config from first location found ─────────────────────────
 for _conf in \
@@ -155,7 +155,7 @@ if [[ "$MODE" == "status" ]]; then
         rel="${local_file#$SAVES_DIR/}"
         game_dir=$(dirname "$rel")
         filename=$(basename "$local_file")
-        game_name="${game_dir//\//_}_${filename%.*}"
+        game_name="${game_dir//\//_}_${filename}"
         is_excluded "$game_name" && continue
 
         cs=$(checksum "$local_file")
@@ -182,7 +182,7 @@ push_saves() {
         rel="${local_file#$SAVES_DIR/}"
         game_dir=$(dirname "$rel")
         filename=$(basename "$local_file")
-        game_name="${game_dir//\//_}_${filename%.*}"
+        game_name="${game_dir//\//_}_${filename}"
 
         if [[ -n "$FILTER_GAME" && "$game_name" != *"$FILTER_GAME"* ]]; then
             continue
