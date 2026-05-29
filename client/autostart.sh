@@ -12,13 +12,22 @@
 #  replacing it.
 # ─────────────────────────────────────────────────────────────
 
-# ── Source BatoSync config ────────────────────────────────────
-[[ -f /userdata/system/batosync.conf ]] && source /userdata/system/batosync.conf
-
 VERSION="1.2.0 (2026-05-29)"
 
-SYNC_SCRIPT="/userdata/scripts/batosync.sh"
-LOG="/userdata/system/logs/batosync.log"
+# Load config from first location found
+for _conf in "/userdata/system/batosync.conf" "/mnt/mmc/MUOS/batosync.conf" \
+             "$(dirname "$(realpath "$0")")/batosync.conf" "$HOME/batosync.conf"; do
+    [[ -f "$_conf" ]] && source "$_conf" && break
+done
+
+# Find sync script
+SYNC_SCRIPT=""
+for _s in "/userdata/scripts/batosync.sh" "/mnt/mmc/MUOS/bin/batosync.sh" \
+          "$(dirname "$(realpath "$0")")/batosync.sh"; do
+    [[ -x "$_s" ]] && SYNC_SCRIPT="$_s" && break
+done
+SYNC_SCRIPT="${SYNC_SCRIPT:-/userdata/scripts/batosync.sh}"
+LOG="${BATOSYNC_LOG:-/userdata/system/logs/batosync.log}"
 
 mkdir -p "$(dirname "$LOG")"
 

@@ -20,6 +20,15 @@ set -euo pipefail
 
 VERSION="2.0.0 (2026-05-29)"
 
+# ── Load config from first location found ─────────────────────────
+for _conf in \
+    "/userdata/system/batosync.conf" \
+    "/mnt/mmc/MUOS/batosync.conf" \
+    "$(dirname "$(realpath "$0")")/batosync.conf" \
+    "$HOME/batosync.conf"; do
+    [[ -f "$_conf" ]] && source "$_conf" && break
+done
+
 # ── Configuration ─────────────────────────────────────────────────
 SERVER_URL="${BATOSYNC_SERVER:-http://192.168.1.100:5000}"
 API_KEY="${BATOSYNC_KEY:-change_me_to_a_secret_passphrase}"
