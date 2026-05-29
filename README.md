@@ -131,6 +131,20 @@ This should show an empty game list (since nothing has synced yet). If it works,
 
 ---
 
+## Adding a new device
+
+When setting up BatoSync on a device for the first time, always **pull before you play**. This downloads all existing saves from the server so the device starts fully in sync:
+
+```bash
+/userdata/scripts/batosync.sh --pull
+```
+
+After that first pull, just play normally — saves will push to the server when you quit a game and pull down any new games you've never played on this device.
+
+> **Why this matters:** BatoSync never overwrites an existing local save on pull — it only downloads saves for games not yet present on that device. If you skip the first pull and play a game before syncing, that device's save becomes the authoritative version for that game and will push to the server, potentially replacing progress from another device.
+
+---
+
 ## Using BatoSync
 
 ### Basic commands
