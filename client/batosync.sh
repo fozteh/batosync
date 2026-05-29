@@ -25,7 +25,7 @@ SERVER_URL="${BATOSYNC_SERVER:-http://192.168.1.100:5000}"
 API_KEY="${BATOSYNC_KEY:-change_me_to_a_secret_passphrase}"
 SAVES_DIR="${BATOSYNC_SAVES:-/userdata/saves}"
 DEVICE_NAME="${BATOSYNC_DEVICE:-$(hostname)}"
-LOG_FILE="/userdata/system/logs/batosync.log"
+LOG_FILE="${BATOSYNC_LOG:-/userdata/system/logs/batosync.log}"
 # Space-separated list of top-level save dirs to skip (e.g. "supermodel arcade")
 EXCLUDE_DIRS="${BATOSYNC_EXCLUDE_DIRS:-}"
 # Conflict behaviour: warn (push anyway with warning) | skip (keep server version)
