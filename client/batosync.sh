@@ -18,7 +18,7 @@
 
 set -euo pipefail
 
-VERSION="2.6.0 (2026-05-29)"
+VERSION="2.7.0 (2026-05-29)"
 
 # ── Load config from first location found ─────────────────────────
 for _conf in \
@@ -284,7 +284,7 @@ for g in games:
 
         is_excluded "$game_name" && continue
 
-        encoded_game=$(python3 -c "import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))" "$game_name")
+        encoded_game=$(python3 -c "import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))" "$game_name") || continue
 
         save_info=$(api_json GET "/saves/${encoded_game}" 2>/dev/null) || true
         server_cs=$(echo "$save_info" | python3 -c "
@@ -341,13 +341,13 @@ import json, sys
 data = json.load(sys.stdin)
 saves = data.get('saves', [])
 print(saves[0].get('original_path','') if saves else '')
-" 2>/dev/null)
+" 2>/dev/null) || true
             orig_fname=$(echo "$save_info" | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
 saves = data.get('saves', [])
 print(saves[0].get('original_filename','save.srm') if saves else 'save.srm')
-" 2>/dev/null)
+" 2>/dev/null) || orig_fname="save.srm"
             if [[ -n "$orig_path" ]]; then
                 # Use exact original path recorded at push time
                 dest_file="${SAVES_DIR}/${orig_path}"
