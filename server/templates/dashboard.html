@@ -1,0 +1,753 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BatoSync Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #0d0f14;
+    --surface:  #13161e;
+    --surface2: #1a1e28;
+    --border:   #1e2330;
+    --accent:   #00e5a0;
+    --accent2:  #7b5ea7;
+    --amber:    #f5a623;
+    --danger:   #e0454e;
+    --text:     #c8d0e0;
+    --muted:    #5a6278;
+    --mono:     'Share Tech Mono', monospace;
+    --sans:     'Exo 2', sans-serif;
+  }
+
+  body.light {
+    --bg:       #f0f2f7;
+    --surface:  #ffffff;
+    --surface2: #e8eaf0;
+    --border:   #d0d5e0;
+    --accent:   #00a873;
+    --accent2:  #6a4e96;
+    --amber:    #c07800;
+    --danger:   #c0373f;
+    --text:     #1a1f2e;
+    --muted:    #7a8299;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-weight: 300;
+    min-height: 100vh;
+    overflow-x: hidden;
+    transition: background 0.2s, color 0.2s;
+  }
+
+  body:not(.light)::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(
+      0deg, transparent, transparent 2px,
+      rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 4px
+    );
+    pointer-events: none; z-index: 9999;
+  }
+
+  body:not(.light)::after {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,160,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,160,0.025) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none; z-index: 0;
+  }
+
+  header {
+    position: relative; z-index: 10;
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; height: 64px;
+    background: var(--bg);
+    backdrop-filter: blur(8px);
+  }
+
+  .logo {
+    display: flex; align-items: center; gap: 0.75rem;
+    font-family: var(--mono); font-size: 1.15rem;
+    color: var(--accent); letter-spacing: 0.08em;
+  }
+
+  .logo-icon {
+    width: 28px; height: 28px;
+    border: 2px solid var(--accent); border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.85rem;
+    animation: pulse-border 3s ease-in-out infinite;
+  }
+
+  @keyframes pulse-border {
+    0%,100% { box-shadow: 0 0 0 0 rgba(0,229,160,0.4); }
+    50%      { box-shadow: 0 0 0 6px rgba(0,229,160,0); }
+  }
+
+  .header-right { display: flex; align-items: center; gap: 1rem; }
+
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 6px var(--accent);
+    animation: blink 2s ease-in-out infinite;
+  }
+  .status-dot.offline { background: var(--danger); box-shadow: 0 0 6px var(--danger); animation: none; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .last-updated { font-family: var(--mono); font-size: 0.7rem; color: var(--muted); }
+
+  .icon-btn {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    padding: 0.35rem 0.75rem; border-radius: 4px;
+    font-family: var(--mono); font-size: 0.7rem; cursor: pointer;
+    transition: all 0.2s; letter-spacing: 0.05em;
+  }
+  .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  main { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 2rem; }
+
+  .stats-bar {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 1rem; margin-bottom: 2rem;
+  }
+  @media (max-width: 700px) { .stats-bar { grid-template-columns: repeat(2, 1fr); } }
+
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 1.1rem 1.3rem;
+    position: relative; overflow: hidden; animation: fadeUp 0.4s ease both;
+  }
+  .stat-card::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+  .stat-card:nth-child(1)::after { background: var(--accent); }
+  .stat-card:nth-child(2)::after { background: var(--accent2); }
+  .stat-card:nth-child(3)::after { background: var(--amber); }
+  .stat-card:nth-child(4)::after { background: var(--danger); }
+
+  .stat-label { font-family: var(--mono); font-size: 0.65rem; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 0.5rem; }
+  .stat-value { font-family: var(--mono); font-size: 1.8rem; color: var(--text); line-height: 1; }
+  .stat-sub   { font-size: 0.7rem; color: var(--muted); margin-top: 0.3rem; }
+
+  .section-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;
+  }
+  .section-title { font-family: var(--mono); font-size: 0.75rem; color: var(--accent); letter-spacing: 0.15em; text-transform: uppercase; }
+  .game-count    { font-family: var(--mono); font-size: 0.7rem; color: var(--muted); }
+
+  .search-row { display: flex; gap: 0.75rem; margin-bottom: 1.25rem; }
+  .search-input {
+    flex: 1; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 4px; color: var(--text); font-family: var(--mono);
+    font-size: 0.8rem; padding: 0.55rem 0.9rem; outline: none; transition: border-color 0.2s;
+  }
+  .search-input:focus { border-color: var(--accent); }
+  .search-input::placeholder { color: var(--muted); }
+
+  /* Emulator grid */
+  .emulator-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1rem; margin-bottom: 2rem;
+  }
+
+  .emulator-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.4rem 1.2rem 1.2rem;
+    cursor: pointer; transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
+    animation: fadeUp 0.4s ease both;
+    display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.5rem;
+    position: relative; overflow: hidden;
+  }
+  .emulator-card::after {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    transform: scaleX(0); transition: transform 0.2s;
+  }
+  .emulator-card:hover { border-color: rgba(0,229,160,0.4); transform: translateY(-3px); box-shadow: 0 6px 24px rgba(0,229,160,0.08); }
+  .emulator-card:hover::after { transform: scaleX(1); }
+  .emulator-card.stale { border-color: rgba(245,166,35,0.35); }
+  .emulator-card.stale::after { background: var(--amber); transform: scaleX(1); }
+
+  .emulator-icon  { font-size: 2rem; line-height: 1; margin-bottom: 0.2rem; }
+  .emulator-name  { font-family: var(--mono); font-size: 0.85rem; font-weight: 500; color: var(--accent); letter-spacing: 0.06em; word-break: break-all; }
+  .emulator-stats { font-family: var(--mono); font-size: 0.68rem; color: var(--muted); }
+  .emulator-stat-num { color: var(--text); }
+  .emulator-time  { font-family: var(--mono); font-size: 0.62rem; color: var(--muted); margin-top: 0.2rem; }
+  .emulator-device { font-family: var(--mono); font-size: 0.6rem; color: var(--accent2); margin-top: 0.1rem; }
+  .stale-badge {
+    font-family: var(--mono); font-size: 0.58rem; padding: 0.1rem 0.4rem;
+    border-radius: 3px; background: rgba(245,166,35,0.15); border: 1px solid rgba(245,166,35,0.4);
+    color: var(--amber); margin-top: 0.2rem;
+  }
+
+  /* Game list layout */
+  .layout { display: grid; grid-template-columns: 1fr 220px; gap: 1.5rem; align-items: start; }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+
+  .games-list { display: flex; flex-direction: column; gap: 0.6rem; }
+
+  .game-row {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; display: grid;
+    grid-template-columns: 1fr auto auto auto;
+    align-items: center; gap: 1rem; padding: 0.9rem 1.2rem;
+    cursor: pointer; transition: border-color 0.2s, transform 0.15s;
+    animation: fadeUp 0.35s ease both; position: relative; overflow: hidden;
+  }
+  .game-row::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background: var(--accent); transform: scaleY(0); transition: transform 0.2s; border-radius: 0 2px 2px 0;
+  }
+  .game-row:hover { border-color: rgba(0,229,160,0.3); transform: translateX(2px); }
+  .game-row:hover::before { transform: scaleY(1); }
+
+  .game-name { font-weight: 500; font-size: 0.9rem; color: var(--text); }
+  .game-meta { font-family: var(--mono); font-size: 0.65rem; color: var(--muted); margin-top: 0.2rem; }
+
+  .device-badge {
+    font-family: var(--mono); font-size: 0.65rem; padding: 0.25rem 0.6rem;
+    border-radius: 3px; background: rgba(123,94,167,0.15); border: 1px solid rgba(123,94,167,0.3);
+    color: #b09fd0; white-space: nowrap;
+  }
+  .backup-count { font-family: var(--mono); font-size: 0.65rem; color: var(--muted); white-space: nowrap; }
+
+  .dl-btn {
+    background: none; border: 1px solid rgba(0,229,160,0.25); color: var(--accent);
+    padding: 0.3rem 0.7rem; border-radius: 4px; font-family: var(--mono);
+    font-size: 0.68rem; cursor: pointer; transition: all 0.15s; white-space: nowrap; letter-spacing: 0.04em;
+  }
+  .dl-btn:hover { background: rgba(0,229,160,0.1); border-color: var(--accent); }
+
+  /* Expanded detail */
+  .game-detail {
+    display: none; background: var(--surface2);
+    border: 1px solid var(--border); border-top: none;
+    border-radius: 0 0 6px 6px; margin-top: -8px;
+    padding: 1rem 1.2rem 1rem 1.4rem; animation: expandDown 0.2s ease;
+  }
+  .game-detail.open { display: block; }
+  @keyframes expandDown { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+
+  .backup-table { width: 100%; border-collapse: collapse; }
+  .backup-table th {
+    font-family: var(--mono); font-size: 0.62rem; color: var(--muted);
+    letter-spacing: 0.1em; text-transform: uppercase; text-align: left;
+    padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border);
+  }
+  .backup-table td {
+    font-family: var(--mono); font-size: 0.72rem; color: var(--text);
+    padding: 0.55rem 0.5rem; border-bottom: 1px solid rgba(30,35,48,0.5);
+  }
+  .backup-table tr:last-child td { border-bottom: none; }
+  .backup-table tr:hover td { background: rgba(0,229,160,0.03); }
+
+  .badge-latest {
+    background: rgba(0,229,160,0.12); border: 1px solid rgba(0,229,160,0.3);
+    color: var(--accent); padding: 0.15rem 0.45rem; border-radius: 3px;
+    font-size: 0.6rem; letter-spacing: 0.08em;
+  }
+  .badge-backup {
+    background: rgba(90,98,120,0.2); border: 1px solid var(--border);
+    color: var(--muted); padding: 0.15rem 0.45rem; border-radius: 3px; font-size: 0.6rem;
+  }
+
+  /* Sidebar */
+  .sidebar-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; animation: fadeUp 0.5s ease both; }
+  .sidebar-card-head { font-family: var(--mono); font-size: 0.65rem; color: var(--accent); letter-spacing: 0.15em; text-transform: uppercase; padding: 0.8rem 1rem; border-bottom: 1px solid var(--border); }
+
+  .device-entry { display: flex; align-items: center; gap: 0.7rem; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); font-size: 0.78rem; }
+  .device-entry:last-child { border-bottom: none; }
+  .device-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .device-name  { font-weight: 500; color: var(--text); font-size: 0.8rem; }
+  .device-saves { font-family: var(--mono); font-size: 0.62rem; color: var(--muted); margin-top: 0.15rem; }
+  .device-actions { margin-top: 0.35rem; }
+
+  .back-btn {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    padding: 0.3rem 0.8rem; border-radius: 4px; font-family: var(--mono);
+    font-size: 0.68rem; cursor: pointer; transition: all 0.2s; letter-spacing: 0.05em;
+  }
+  .back-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .empty-state { text-align: center; padding: 4rem 2rem; color: var(--muted); font-family: var(--mono); font-size: 0.8rem; line-height: 1.8; }
+  .empty-icon  { font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.4; }
+
+  .error-banner {
+    background: rgba(224,69,78,0.1); border: 1px solid rgba(224,69,78,0.3);
+    color: #e0909a; border-radius: 6px; padding: 1rem 1.2rem;
+    font-family: var(--mono); font-size: 0.78rem; margin-bottom: 1.5rem;
+  }
+
+  .spinner {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @keyframes fadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+
+  footer {
+    position: relative; z-index: 1; text-align: center;
+    padding: 1.5rem; font-family: var(--mono); font-size: 0.65rem;
+    color: var(--muted); border-top: 1px solid var(--border);
+    margin-top: 3rem; letter-spacing: 0.05em;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">▶</div>
+    BATOSYNC
+  </div>
+  <div class="header-right">
+    <span class="last-updated" id="last-updated">Loading…</span>
+    <span class="status-dot" id="status-dot"></span>
+    <button class="icon-btn" onclick="loadData()">↺ REFRESH</button>
+    <button class="icon-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode">☀</button>
+  </div>
+</header>
+
+<main>
+  <div id="error-area"></div>
+
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-label">Emulators</div>
+      <div class="stat-value" id="stat-systems"><span class="spinner"></span></div>
+      <div class="stat-sub">with saves</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Games</div>
+      <div class="stat-value" id="stat-games"><span class="spinner"></span></div>
+      <div class="stat-sub">stored on server</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Devices</div>
+      <div class="stat-value" id="stat-devices"><span class="spinner"></span></div>
+      <div class="stat-sub">unique devices</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Last Sync</div>
+      <div class="stat-value" style="font-size:1rem;padding-top:0.3rem" id="stat-last"><span class="spinner"></span></div>
+      <div class="stat-sub" id="stat-last-device">&nbsp;</div>
+    </div>
+  </div>
+
+  <!-- Emulator grid view -->
+  <div id="view-emulators">
+    <div class="section-head">
+      <span class="section-title">// EMULATORS</span>
+      <span class="game-count" id="sys-count">—</span>
+    </div>
+    <div class="emulator-grid" id="emulator-grid">
+      <div class="empty-state">
+        <div class="spinner" style="width:24px;height:24px;border-width:3px"></div>
+        <div style="margin-top:1rem">Connecting to server…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game list drill-down view -->
+  <div id="view-games" style="display:none">
+    <div class="section-head">
+      <div style="display:flex;align-items:center;gap:1rem">
+        <button class="back-btn" onclick="showEmulators()">← BACK</button>
+        <span class="section-title" id="games-section-title">// GAMES</span>
+      </div>
+      <span class="game-count" id="game-count">—</span>
+    </div>
+    <div class="search-row">
+      <input class="search-input" type="text" id="search" placeholder="Filter games…" oninput="filterGames()">
+    </div>
+    <div class="layout">
+      <div class="games-list" id="games-list"></div>
+      <div>
+        <div class="sidebar-card">
+          <div class="sidebar-card-head">// Devices</div>
+          <div id="devices-list">
+            <div style="padding:1.2rem;font-family:var(--mono);font-size:0.7rem;color:var(--muted)">Loading…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>BATOSYNC SERVER &nbsp;·&nbsp; v{{ version }}</footer>
+
+<script>
+let allGames = [];
+let currentSystem = null;
+const DEVICE_COLORS = ['#00e5a0','#7b5ea7','#f5a623','#4da3ff','#e0454e','#2ecf9a'];
+const STALE_DAYS = 7;
+const SYSTEM_ICONS = {
+  duckstation:'🎮', psx:'🎮', ps2:'🎮', ps3:'🎮', ps4:'🎮',
+  snes:'🕹️', nes:'🕹️', gb:'🕹️', gba:'🕹️', gbc:'🕹️', nds:'🕹️',
+  n64:'🎯', gamecube:'🎯', wii:'🎯', wiiu:'🎯',
+  megadrive:'⚡', genesis:'⚡', mastersystem:'⚡', saturn:'⚡', dreamcast:'⚡',
+  xbox360:'🟩', xbox:'🟩',
+  psp:'📺', psvita:'📺',
+  mame:'🕹️', arcade:'🕹️', neogeo:'🕹️', supermodel:'🎰',
+  default:'💾'
+};
+
+// ── Theme ──────────────────────────────────────────────────────
+function initTheme() {
+  const saved = localStorage.getItem('batosync-theme') || 'dark';
+  applyTheme(saved);
+}
+
+function applyTheme(theme) {
+  document.body.classList.toggle('light', theme === 'light');
+  document.getElementById('theme-toggle').textContent = theme === 'light' ? '🌙' : '☀';
+  localStorage.setItem('batosync-theme', theme);
+}
+
+function toggleTheme() {
+  const current = localStorage.getItem('batosync-theme') || 'dark';
+  applyTheme(current === 'dark' ? 'light' : 'dark');
+}
+
+// ── Data loading ───────────────────────────────────────────────
+async function loadData() {
+  document.getElementById('last-updated').textContent = 'Refreshing…';
+  try {
+    const resp = await fetch('/games', { headers: { 'X-API-Key': window._apiKey || '' } });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    allGames = data.games || [];
+    renderStats(allGames);
+    renderEmulators(allGames);
+    if (currentSystem) renderGames(gamesForSystem(currentSystem));
+    loadDevices();
+    document.getElementById('status-dot').className = 'status-dot';
+    document.getElementById('last-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+    document.getElementById('error-area').innerHTML = '';
+  } catch (e) {
+    document.getElementById('status-dot').className = 'status-dot offline';
+    document.getElementById('last-updated').textContent = 'Connection failed';
+    document.getElementById('error-area').innerHTML =
+      `<div class="error-banner">⚠ Could not reach the BatoSync API: ${e.message}</div>`;
+    document.getElementById('emulator-grid').innerHTML =
+      '<div class="empty-state"><div class="empty-icon" style="font-size:2rem">⛔</div>Server unreachable</div>';
+  }
+}
+
+async function loadDevices() {
+  try {
+    const resp = await fetch('/devices', { headers: { 'X-API-Key': window._apiKey || '' } });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    renderDevices(data.devices || []);
+  } catch (e) { /* silent */ }
+}
+
+// ── Grouping helpers ───────────────────────────────────────────
+function groupBySystem(games) {
+  const map = {};
+  games.forEach(g => {
+    const sys = gameSystem(g.game) || '(unknown)';
+    if (!map[sys]) map[sys] = [];
+    map[sys].push(g);
+  });
+  return map;
+}
+
+function gamesForSystem(sys) {
+  return allGames.filter(g => (gameSystem(g.game) || '(unknown)') === sys);
+}
+
+function latestTime(games) {
+  return games.reduce((best, g) => {
+    const t = g.latest_uploaded_at || g.latest_saved_at || '';
+    return t > best ? t : best;
+  }, '');
+}
+
+function latestDevice(games) {
+  const t = latestTime(games);
+  const g = games.find(x => (x.latest_uploaded_at || x.latest_saved_at) === t);
+  return g ? g.latest_device : '';
+}
+
+// ── Stats ──────────────────────────────────────────────────────
+function renderStats(games) {
+  const systems = Object.keys(groupBySystem(games));
+  const devices = [...new Set(games.map(g => g.latest_device).filter(Boolean))];
+  document.getElementById('stat-systems').textContent = systems.length;
+  document.getElementById('stat-games').textContent = games.length;
+  document.getElementById('stat-devices').textContent = devices.length;
+
+  if (games.length) {
+    const sorted = [...games].sort((a,b) =>
+      (b.latest_uploaded_at||b.latest_saved_at||'').localeCompare(a.latest_uploaded_at||a.latest_saved_at||''));
+    const latest = sorted[0];
+    const d = new Date(latest.latest_uploaded_at || latest.latest_saved_at);
+    document.getElementById('stat-last').textContent = timeAgo(d);
+    document.getElementById('stat-last-device').textContent = latest.latest_device || '—';
+  } else {
+    document.getElementById('stat-last').textContent = '—';
+  }
+}
+
+// ── Emulator cards ─────────────────────────────────────────────
+function renderEmulators(games) {
+  const grouped = groupBySystem(games);
+  const container = document.getElementById('emulator-grid');
+  document.getElementById('sys-count').textContent =
+    `${Object.keys(grouped).length} emulator${Object.keys(grouped).length !== 1 ? 's' : ''}`;
+
+  if (!Object.keys(grouped).length) {
+    container.innerHTML = `<div class="empty-state">
+      <div class="empty-icon" style="font-size:2rem">🎮</div>
+      No save files yet.<br>Run batosync.sh on your Batocera device to upload saves.
+    </div>`;
+    return;
+  }
+
+  const entries = Object.entries(grouped).sort((a,b) => a[0].localeCompare(b[0]));
+
+  container.innerHTML = '';
+  entries.forEach(([sys, sysGames], i) => {
+    const totalSaves = sysGames.reduce((n, g) => n + g.save_count, 0);
+    const lastTime   = latestTime(sysGames);
+    const lastDev    = latestDevice(sysGames);
+    const d          = lastTime ? new Date(lastTime) : null;
+    const icon       = SYSTEM_ICONS[sys.toLowerCase()] || SYSTEM_ICONS.default;
+    const ageDays    = d ? Math.floor((Date.now() - d) / 86400000) : null;
+    const isStale    = ageDays !== null && ageDays >= STALE_DAYS;
+
+    const card = document.createElement('div');
+    card.className = 'emulator-card' + (isStale ? ' stale' : '');
+    card.style.animationDelay = `${i * 0.06}s`;
+    card.innerHTML = `
+      <div class="emulator-icon">${icon}</div>
+      <div class="emulator-name">${escHtml(sys)}</div>
+      <div class="emulator-stats">
+        <span class="emulator-stat-num">${sysGames.length}</span>
+        <span class="emulator-stat-label"> game${sysGames.length !== 1 ? 's' : ''}</span>
+        &nbsp;·&nbsp;
+        <span class="emulator-stat-num">${totalSaves}</span>
+        <span class="emulator-stat-label"> save${totalSaves !== 1 ? 's' : ''}</span>
+      </div>
+      <div class="emulator-time">${d ? timeAgo(d) : 'no syncs yet'}</div>
+      ${lastDev ? `<div class="emulator-device">via ${escHtml(lastDev)}</div>` : ''}
+      ${isStale ? `<div class="stale-badge">⚠ ${ageDays}d ago</div>` : ''}
+    `;
+    card.addEventListener('click', () => showGames(sys));
+    container.appendChild(card);
+  });
+}
+
+// ── Navigation ─────────────────────────────────────────────────
+function showGames(sys) {
+  currentSystem = sys;
+  document.getElementById('view-emulators').style.display = 'none';
+  document.getElementById('view-games').style.display = 'block';
+  document.getElementById('games-section-title').textContent = `// ${sys.toUpperCase()}`;
+  document.getElementById('search').value = '';
+  renderGames(gamesForSystem(sys));
+}
+
+function showEmulators() {
+  currentSystem = null;
+  document.getElementById('view-games').style.display = 'none';
+  document.getElementById('view-emulators').style.display = 'block';
+}
+
+// ── Game list ──────────────────────────────────────────────────
+function renderGames(games) {
+  const container = document.getElementById('games-list');
+  const sorted = [...games].sort((a,b) => prettyNameRaw(a.game).localeCompare(prettyNameRaw(b.game)));
+  document.getElementById('game-count').textContent = `${sorted.length} game${sorted.length !== 1 ? 's' : ''}`;
+
+  if (!sorted.length) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon" style="font-size:2rem">🎮</div>No saves found.</div>`;
+    return;
+  }
+
+  container.innerHTML = '';
+  sorted.forEach((game, i) => {
+    const row = document.createElement('div');
+    row.className = 'game-row';
+    row.style.animationDelay = `${i * 0.04}s`;
+    row.dataset.game = game.game;
+
+    const d = game.latest_uploaded_at
+      ? new Date(game.latest_uploaded_at)
+      : game.latest_saved_at ? new Date(game.latest_saved_at) : null;
+    const sizeStr = game.latest_size ? fmtSize(game.latest_size) : '';
+
+    row.innerHTML = `
+      <div>
+        <div class="game-name">${prettyName(game.game)}</div>
+        <div class="game-meta">${d ? timeAgo(d) : 'no date'}${sizeStr ? ' &nbsp;·&nbsp; ' + sizeStr : ''}</div>
+      </div>
+      <div class="device-badge">${escHtml(game.latest_device || '—')}</div>
+      <div class="backup-count">${game.save_count}/${window._maxBackups||3} saves</div>
+      <button class="dl-btn" onclick="event.stopPropagation(); downloadLatest('${escHtml(game.game)}')">↓ DL</button>
+    `;
+    row.addEventListener('click', () => toggleDetail(game.game, row));
+    container.appendChild(row);
+
+    const detail = document.createElement('div');
+    detail.className = 'game-detail';
+    detail.id = `detail-${CSS.escape(game.game)}`;
+    detail.innerHTML = `<div style="font-family:var(--mono);font-size:0.65rem;color:var(--muted)">Loading backups…</div>`;
+    container.appendChild(detail);
+  });
+}
+
+async function toggleDetail(gameName, row) {
+  const detailId = `detail-${CSS.escape(gameName)}`;
+  const detail = document.getElementById(detailId);
+  if (!detail) return;
+
+  document.querySelectorAll('.game-detail.open').forEach(d => {
+    if (d.id !== detailId) d.classList.remove('open');
+  });
+
+  if (detail.classList.contains('open')) { detail.classList.remove('open'); return; }
+
+  detail.classList.add('open');
+  detail.innerHTML = `<div style="font-family:var(--mono);font-size:0.65rem;color:var(--muted)">
+    <span class="spinner"></span> Loading backups…</div>`;
+
+  try {
+    const resp = await fetch(`/saves/${encodeURIComponent(gameName)}`,
+      { headers: { 'X-API-Key': window._apiKey || '' } });
+    const data = await resp.json();
+    const saves = data.saves || [];
+
+    if (!saves.length) {
+      detail.innerHTML = `<div style="font-family:var(--mono);font-size:0.7rem;color:var(--muted)">No saves found.</div>`;
+      return;
+    }
+
+    const rows = saves.map((s, idx) => `
+      <tr>
+        <td>${idx === 0 ? '<span class="badge-latest">LATEST</span>' : `<span class="badge-backup">BACKUP ${idx}</span>`}</td>
+        <td>${escHtml(s.device || '—')}</td>
+        <td>${(s.uploaded_at || s.saved_at) ? new Date(s.uploaded_at || s.saved_at).toLocaleString() : '—'}</td>
+        <td>${s.size ? fmtSize(s.size) : '—'}</td>
+        <td>${escHtml(s.checksum ? s.checksum.slice(0,8)+'…' : '—')}</td>
+        <td><button class="dl-btn" onclick="downloadBackup('${escHtml(gameName)}', ${idx})">↓ DL</button></td>
+      </tr>
+    `).join('');
+
+    detail.innerHTML = `
+      <table class="backup-table">
+        <thead><tr><th>Status</th><th>Device</th><th>Saved</th><th>Size</th><th>Checksum</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  } catch (e) {
+    detail.innerHTML = `<div style="font-family:var(--mono);font-size:0.7rem;color:var(--danger)">Failed to load: ${e.message}</div>`;
+  }
+}
+
+// ── Devices sidebar ────────────────────────────────────────────
+function renderDevices(devices) {
+  const container = document.getElementById('devices-list');
+  if (!devices.length) {
+    container.innerHTML = `<div style="padding:1rem;font-family:var(--mono);font-size:0.7rem;color:var(--muted)">No devices yet</div>`;
+    return;
+  }
+  const sorted = [...devices].sort((a,b) => (b.last_seen||'').localeCompare(a.last_seen||''));
+  container.innerHTML = sorted.map(({ name, last_seen }, i) => `
+    <div class="device-entry">
+      <div class="device-dot" style="background:${DEVICE_COLORS[i % DEVICE_COLORS.length]};box-shadow:0 0 5px ${DEVICE_COLORS[i % DEVICE_COLORS.length]}"></div>
+      <div style="flex:1;min-width:0">
+        <div class="device-name">${escHtml(name)}</div>
+        <div class="device-saves">${last_seen ? timeAgo(new Date(last_seen)) : 'never'}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+
+// ── Search / filter ────────────────────────────────────────────
+function filterGames() {
+  const q = document.getElementById('search').value.toLowerCase();
+  const base = currentSystem ? gamesForSystem(currentSystem) : allGames;
+  const filtered = q ? base.filter(g =>
+    g.game.toLowerCase().includes(q) || (g.latest_device||'').toLowerCase().includes(q)
+  ) : base;
+  renderGames(filtered);
+}
+
+// ── Downloads ──────────────────────────────────────────────────
+function downloadLatest(gameName) { triggerDownload(`/saves/${encodeURIComponent(gameName)}/latest`); }
+function downloadBackup(gameName, index) { triggerDownload(`/saves/${encodeURIComponent(gameName)}/${index}`); }
+
+async function triggerDownload(url) {
+  try {
+    const resp = await fetch(url, { headers: { 'X-API-Key': window._apiKey || '' } });
+    if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
+    const cd = resp.headers.get('Content-Disposition') || '';
+    const match = cd.match(/filename[^;=\n]*=["']?([^"';\n]+)/);
+    const name = match ? match[1] : 'save.srm';
+    const blob = await resp.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    URL.revokeObjectURL(a.href);
+  } catch (e) { alert('Download failed: ' + e.message); }
+}
+
+// ── Utilities ──────────────────────────────────────────────────
+function gameSystem(raw) { const idx = raw.indexOf('_'); return idx > 0 ? raw.slice(0, idx) : ''; }
+
+function prettyNameRaw(raw) {
+  const parts = raw.split('_');
+  return parts.length >= 2 ? parts.slice(1).join(' ') : raw;
+}
+
+function prettyName(raw) {
+  const parts = raw.split('_');
+  const name = parts.length >= 2 ? parts.slice(1).join('_') : raw;
+  return escHtml(name.replace(/_/g, ' '));
+}
+
+function fmtSize(bytes) {
+  if (!bytes) return '';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+function timeAgo(date) {
+  if (!date || isNaN(date)) return '—';
+  const secs = Math.floor((Date.now() - date) / 1000);
+  if (secs < 60) return 'just now';
+  if (secs < 3600) return `${Math.floor(secs/60)}m ago`;
+  if (secs < 86400) return `${Math.floor(secs/3600)}h ago`;
+  return `${Math.floor(secs/86400)}d ago`;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Init ───────────────────────────────────────────────────────
+window._apiKey     = "{{ api_key }}";
+window._maxBackups = {{ max_backups }};
+initTheme();
+loadData();
+setInterval(loadData, 30000);
+</script>
+</body>
+</html>

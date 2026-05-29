@@ -1,0 +1,59 @@
+﻿#!/bin/bash
+# ─────────────────────────────────────────────────────────────
+#  BatoSync — autostart.sh
+#  Runs once at Batocera boot. Pulls all latest saves from the
+#  server so the device is fully up to date before you play.
+#
+#  Install: copy to /userdata/system/autostart.sh
+#           chmod +x /userdata/system/autostart.sh
+#
+#  NOTE: If you already have a custom autostart.sh, add the
+#  lines between the markers to your existing file instead of
+#  replacing it.
+# ─────────────────────────────────────────────────────────────
+
+# ── Source BatoSync config ────────────────────────────────────
+[[ -f /userdata/system/batosync.conf ]] && source /userdata/system/batosync.conf
+
+VERSION="1.2.0 (2026-05-29)"
+
+SYNC_SCRIPT="/userdata/scripts/batosync.sh"
+LOG="/userdata/system/logs/batosync.log"
+
+mkdir -p "$(dirname "$LOG")"
+
+echo "" >> "$LOG"
+echo "═══════════════════════════════════" >> "$LOG"
+echo "[BOOT] $(date '+%Y-%m-%d %H:%M:%S') — Batocera starting" >> "$LOG"
+
+if [[ ! -x "$SYNC_SCRIPT" ]]; then
+    echo "[BOOT] batosync.sh not found — skipping boot sync" >> "$LOG"
+    exit 0
+fi
+
+if [[ -z "${BATOSYNC_SERVER:-}" ]]; then
+    echo "[BOOT] BATOSYNC_SERVER not set — skipping boot sync" >> "$LOG"
+    exit 0
+fi
+
+echo "[BOOT] Waiting for network…" >> "$LOG"
+
+# Wait for network (up to 30 seconds)
+ATTEMPTS=0
+until curl -sf --max-time 3 "${BATOSYNC_SERVER}/health" > /dev/null 2>&1; do
+    sleep 3
+    ATTEMPTS=$((ATTEMPTS + 1))
+    if [[ $ATTEMPTS -ge 10 ]]; then
+        echo "[BOOT] Server unreachable after 30s — skipping boot sync" >> "$LOG"
+        exit 0
+    fi
+done
+
+echo "[BOOT] Server reachable. Pulling latest saves…" >> "$LOG"
+
+# Pull all saves in the background so EmulationStation loads without waiting
+"$SYNC_SCRIPT" --pull >> "$LOG" 2>&1 &
+
+echo "[BOOT] Pull started in background (PID $!)" >> "$LOG"
+
+exit 0
