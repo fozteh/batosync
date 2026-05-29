@@ -18,7 +18,7 @@
 
 set -euo pipefail
 
-VERSION="2.1.0 (2026-05-29)"
+VERSION="2.2.0 (2026-05-29)"
 
 # ── Load config from first location found ─────────────────────────
 for _conf in \
@@ -257,13 +257,19 @@ pull_saves() {
     info "Pulling latest saves from server..."
     local pulled=0 skipped=0
 
-    games_json=$(api_json GET /games 2>/dev/null)
+    games_json=$(api_json GET /games 2>/dev/null || echo '{}')
     games=$(echo "$games_json" | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
-for g in data.get('games', []):
+games = data.get('games', [])
+for g in games:
     print(g['game'])
-" 2>/dev/null)
+" 2>/dev/null || true)
+
+    if [[ -z "$games" ]]; then
+        warn "No games found on server — nothing to pull"
+        return
+    fi
 
     while IFS= read -r game_name; do
         [[ -z "$game_name" ]] && continue
@@ -295,11 +301,20 @@ print(saves[0]['checksum'] if saves else '')
         done)
 
         if [[ -n "$local_file" ]]; then
-            # Never overwrite an existing local save — push handles syncing progress
-            # back to the server; pull only brings down games new to this device
-            info "  = $game_name exists locally — skipping (push to update server)"
-            ((skipped++)) || true
-            continue
+            local_cs=$(checksum "$local_file")
+            if [[ "$local_cs" == "$server_cs" ]]; then
+                info "  = $game_name already up to date"
+                ((skipped++)) || true
+                continue
+            fi
+            if [[ "$DRY_RUN" == "true" ]]; then
+                info "  [DRY-RUN] Would update: $game_name"
+                continue
+            fi
+            cp "$local_file" "${local_file}.batosync_backup"
+            info "  ↓ Downloading newer save for $game_name..."
+            api GET "/saves/${encoded_game}/latest" -o "$local_file" 2>/dev/null || true
+            success "  ✓ $game_name updated"
         else
             if [[ "$DRY_RUN" == "true" ]]; then
                 info "  [DRY-RUN] Would download new: $game_name"
@@ -316,7 +331,7 @@ print(saves[0].get('original_filename','save.srm') if saves else 'save.srm')
             mkdir -p "$dest_dir"
             dest_file="${dest_dir}/$(basename "$reconstructed").${orig_fname##*.}"
             info "  ↓ Downloading $game_name to $dest_file..."
-            api GET "/saves/${encoded_game}/latest" -o "$dest_file" 2>/dev/null
+            api GET "/saves/${encoded_game}/latest" -o "$dest_file" 2>/dev/null || { error "  ✗ Failed to download $game_name"; continue; }
             success "  ✓ $game_name downloaded (new on this device)"
         fi
         ((pulled++)) || true
