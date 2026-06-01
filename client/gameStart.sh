@@ -15,7 +15,7 @@
 #    $4 = rom name (no extension)
 # ─────────────────────────────────────────────────────────────
 
-VERSION="1.2.0 (2026-05-29)"
+VERSION="3.0.0 (2026-05-29)"
 
 SYSTEM="$1"
 EMULATOR="$2"
@@ -51,8 +51,11 @@ if [[ -z "${BATOSYNC_SERVER:-}" ]]; then
     exit 0
 fi
 
-# Pull only (we don't push at game start — the game hasn't run yet)
-# Run in background so it doesn't delay the game launch
-"$SYNC_SCRIPT" --pull --game "${SYSTEM}_${ROM_NAME}" >> "$LOG" 2>&1 &
+# Smart pull: check server checksums against local files for this game.
+# Only downloads if server has something newer — launches immediately if already in sync.
+# Runs synchronously so the game starts with the correct save already on disk.
+echo "[GAME START] Checking for newer saves on server..." >> "$LOG"
+"$SYNC_SCRIPT" --pull --game "${SYSTEM}_${ROM_NAME}" >> "$LOG" 2>&1 || true
+echo "[GAME START] Save check complete — launching game" >> "$LOG"
 
 exit 0
