@@ -524,13 +524,14 @@ function renderEmulators(games) {
 
   container.innerHTML = '';
   entries.forEach(([sys, sysGames], i) => {
-    const totalSaves = sysGames.reduce((n, g) => n + g.save_count, 0);
-    const lastTime   = latestTime(sysGames);
-    const lastDev    = latestDevice(sysGames);
-    const d          = lastTime ? new Date(lastTime) : null;
-    const icon       = SYSTEM_ICONS[sys.toLowerCase()] || SYSTEM_ICONS.default;
-    const ageDays    = d ? Math.floor((Date.now() - d) / 86400000) : null;
-    const isStale    = ageDays !== null && ageDays >= STALE_DAYS;
+    const uniqueGames = new Set(sysGames.map(g => baseGameKey(g.game))).size;
+    const totalFiles  = sysGames.length;
+    const lastTime    = latestTime(sysGames);
+    const lastDev     = latestDevice(sysGames);
+    const d           = lastTime ? new Date(lastTime) : null;
+    const icon        = SYSTEM_ICONS[sys.toLowerCase()] || SYSTEM_ICONS.default;
+    const ageDays     = d ? Math.floor((Date.now() - d) / 86400000) : null;
+    const isStale     = ageDays !== null && ageDays >= STALE_DAYS;
 
     const card = document.createElement('div');
     card.className = 'emulator-card' + (isStale ? ' stale' : '');
@@ -539,11 +540,11 @@ function renderEmulators(games) {
       <div class="emulator-icon">${icon}</div>
       <div class="emulator-name">${escHtml(sys)}</div>
       <div class="emulator-stats">
-        <span class="emulator-stat-num">${sysGames.length}</span>
-        <span class="emulator-stat-label"> game${sysGames.length !== 1 ? 's' : ''}</span>
+        <span class="emulator-stat-num">${uniqueGames}</span>
+        <span class="emulator-stat-label"> game${uniqueGames !== 1 ? 's' : ''}</span>
         &nbsp;·&nbsp;
-        <span class="emulator-stat-num">${totalSaves}</span>
-        <span class="emulator-stat-label"> save${totalSaves !== 1 ? 's' : ''}</span>
+        <span class="emulator-stat-num">${totalFiles}</span>
+        <span class="emulator-stat-label"> file${totalFiles !== 1 ? 's' : ''}</span>
       </div>
       <div class="emulator-time">${d ? timeAgo(d) : 'no syncs yet'}</div>
       ${lastDev ? `<div class="emulator-device">via ${escHtml(lastDev)}</div>` : ''}
@@ -570,11 +571,51 @@ function showEmulators() {
   document.getElementById('view-emulators').style.display = 'block';
 }
 
+// ── Base game grouping helpers ─────────────────────────────────
+// Strip save-type extensions so state1/state2/srm all group under one title
+function baseGameKey(raw) {
+  const idx = raw.indexOf('_');
+  const sys  = idx >= 0 ? raw.slice(0, idx) : '';
+  const name = idx >= 0 ? raw.slice(idx + 1) : raw;
+  const base = name
+    .replace(/\.state\.\w+$/i, '')   // .state.auto, .state.bak
+    .replace(/\.state\d*$/i, '')      // .state, .state1 … .state99
+    .replace(/\.(srm|sav|save|p2s|mcd|ps2|nv[rm]?|mcr|eep|bin|dat|fs|bak|b1|c1|d1|a1|nvm|nvmem|memcard)$/i, '');
+  return sys + '_' + base;
+}
+
+function baseGameDisplayName(raw) {
+  return baseGameKey(raw).split('_').slice(1).join('_').replace(/_/g, ' ');
+}
+
+// Sort save-type extensions: srm first, numbered states, then auto
+function saveTypeSortKey(gameName) {
+  const n = gameName.toLowerCase();
+  if (/\.(srm|sav|save|mcd|ps2|mcr)$/.test(n)) return '0';
+  if (/\.state\.auto$/.test(n))                  return '3';
+  const m = n.match(/\.state(\d+)$/);
+  if (m) return '1' + m[1].padStart(5, '0');
+  if (/\.state$/.test(n))                        return '2';
+  return '4' + n;
+}
+
 // ── Game list ──────────────────────────────────────────────────
 function renderGames(games) {
   const container = document.getElementById('games-list');
-  const sorted = [...games].sort((a,b) => prettyNameRaw(a.game).localeCompare(prettyNameRaw(b.game)));
-  document.getElementById('game-count').textContent = `${sorted.length} game${sorted.length !== 1 ? 's' : ''}`;
+
+  // Group by base game title
+  const groups = {};
+  games.forEach(g => {
+    const key = baseGameKey(g.game);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(g);
+  });
+
+  const sorted = Object.entries(groups)
+    .sort((a, b) => baseGameDisplayName(a[1][0].game).localeCompare(baseGameDisplayName(b[1][0].game)));
+
+  document.getElementById('game-count').textContent =
+    `${sorted.length} game${sorted.length !== 1 ? 's' : ''}`;
 
   if (!sorted.length) {
     container.innerHTML = `<div class="empty-state"><div class="empty-icon" style="font-size:2rem">🎮</div>No saves found.</div>`;
@@ -582,39 +623,46 @@ function renderGames(games) {
   }
 
   container.innerHTML = '';
-  sorted.forEach((game, i) => {
+  sorted.forEach(([groupKey, groupGames], i) => {
+    // Most recent entry across all save types
+    const latest = groupGames.reduce((best, g) => {
+      const t  = g.latest_uploaded_at || g.latest_saved_at || '';
+      const bt = best.latest_uploaded_at || best.latest_saved_at || '';
+      return t > bt ? g : best;
+    });
+
+    const d = latest.latest_uploaded_at
+      ? new Date(latest.latest_uploaded_at)
+      : latest.latest_saved_at ? new Date(latest.latest_saved_at) : null;
+
+    const fileCount  = groupGames.length;
+    const displayName = baseGameDisplayName(groupGames[0].game);
+
     const row = document.createElement('div');
     row.className = 'game-row';
     row.style.animationDelay = `${i * 0.04}s`;
-    row.dataset.game = game.game;
-
-    const d = game.latest_uploaded_at
-      ? new Date(game.latest_uploaded_at)
-      : game.latest_saved_at ? new Date(game.latest_saved_at) : null;
-    const sizeStr = game.latest_size ? fmtSize(game.latest_size) : '';
 
     row.innerHTML = `
       <div>
-        <div class="game-name">${prettyName(game.game)}</div>
-        <div class="game-meta">${d ? timeAgo(d) : 'no date'}${sizeStr ? ' &nbsp;·&nbsp; ' + sizeStr : ''}</div>
+        <div class="game-name">${escHtml(displayName)}</div>
+        <div class="game-meta">${d ? timeAgo(d) : 'no date'} &nbsp;·&nbsp; ${fileCount} save file${fileCount !== 1 ? 's' : ''}</div>
       </div>
-      <div class="device-badge">${escHtml(game.latest_device || '—')}</div>
-      <div class="backup-count">${game.save_count}/${window._maxBackups||3} saves</div>
-      <button class="dl-btn" onclick="event.stopPropagation(); downloadLatest('${escHtml(game.game)}')">↓ DL</button>
+      <div class="device-badge">${escHtml(latest.latest_device || '—')}</div>
+      <div class="backup-count">${fileCount} file${fileCount !== 1 ? 's' : ''}</div>
+      <div></div>
     `;
-    row.addEventListener('click', () => toggleDetail(game.game, row));
+    row.addEventListener('click', () => toggleGroupDetail(groupKey, groupGames, row));
     container.appendChild(row);
 
     const detail = document.createElement('div');
     detail.className = 'game-detail';
-    detail.id = `detail-${CSS.escape(game.game)}`;
-    detail.innerHTML = `<div style="font-family:var(--mono);font-size:0.65rem;color:var(--muted)">Loading backups…</div>`;
+    detail.id = `detail-group-${CSS.escape(groupKey)}`;
     container.appendChild(detail);
   });
 }
 
-async function toggleDetail(gameName, row) {
-  const detailId = `detail-${CSS.escape(gameName)}`;
+function toggleGroupDetail(groupKey, groupGames, row) {
+  const detailId = `detail-group-${CSS.escape(groupKey)}`;
   const detail = document.getElementById(detailId);
   if (!detail) return;
 
@@ -623,41 +671,31 @@ async function toggleDetail(gameName, row) {
   });
 
   if (detail.classList.contains('open')) { detail.classList.remove('open'); return; }
-
   detail.classList.add('open');
-  detail.innerHTML = `<div style="font-family:var(--mono);font-size:0.65rem;color:var(--muted)">
-    <span class="spinner"></span> Loading backups…</div>`;
 
-  try {
-    const resp = await fetch(`/saves/${encodeURIComponent(gameName)}`,
-      { headers: { 'X-API-Key': window._apiKey || '' } });
-    const data = await resp.json();
-    const saves = data.saves || [];
+  // Sort: srm/memory cards first, then numbered states, then auto-state
+  const sortedFiles = [...groupGames].sort((a, b) =>
+    saveTypeSortKey(a.game).localeCompare(saveTypeSortKey(b.game)));
 
-    if (!saves.length) {
-      detail.innerHTML = `<div style="font-family:var(--mono);font-size:0.7rem;color:var(--muted)">No saves found.</div>`;
-      return;
-    }
-
-    const rows = saves.map((s, idx) => `
+  const rows = sortedFiles.map(g => {
+    const ext = g.game.match(/(\.\w+)+$/)?.[0]?.toUpperCase() || '';
+    const d = g.latest_uploaded_at ? new Date(g.latest_uploaded_at) : null;
+    return `
       <tr>
-        <td>${idx === 0 ? '<span class="badge-latest">LATEST</span>' : `<span class="badge-backup">BACKUP ${idx}</span>`}</td>
-        <td>${escHtml(s.device || '—')}</td>
-        <td>${(s.uploaded_at || s.saved_at) ? new Date(s.uploaded_at || s.saved_at).toLocaleString() : '—'}</td>
-        <td>${s.size ? fmtSize(s.size) : '—'}</td>
-        <td>${escHtml(s.checksum ? s.checksum.slice(0,8)+'…' : '—')}</td>
-        <td><button class="dl-btn" onclick="downloadBackup('${escHtml(gameName)}', ${idx})">↓ DL</button></td>
+        <td><span class="badge-latest">${escHtml(ext)}</span></td>
+        <td>${escHtml(g.latest_device || '—')}</td>
+        <td>${d ? d.toLocaleString() : '—'}</td>
+        <td>${g.latest_size ? fmtSize(g.latest_size) : '—'}</td>
+        <td><button class="dl-btn" onclick="downloadLatest('${escHtml(g.game)}')">↓ DL</button></td>
       </tr>
-    `).join('');
+    `;
+  }).join('');
 
-    detail.innerHTML = `
-      <table class="backup-table">
-        <thead><tr><th>Status</th><th>Device</th><th>Saved</th><th>Size</th><th>Checksum</th><th></th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>`;
-  } catch (e) {
-    detail.innerHTML = `<div style="font-family:var(--mono);font-size:0.7rem;color:var(--danger)">Failed to load: ${e.message}</div>`;
-  }
+  detail.innerHTML = `
+    <table class="backup-table">
+      <thead><tr><th>Type</th><th>Device</th><th>Saved</th><th>Size</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
 }
 
 // ── Devices sidebar ────────────────────────────────────────────
@@ -685,7 +723,9 @@ function filterGames() {
   const q = document.getElementById('search').value.toLowerCase();
   const base = currentSystem ? gamesForSystem(currentSystem) : allGames;
   const filtered = q ? base.filter(g =>
-    g.game.toLowerCase().includes(q) || (g.latest_device||'').toLowerCase().includes(q)
+    baseGameDisplayName(g.game).toLowerCase().includes(q) ||
+    g.game.toLowerCase().includes(q) ||
+    (g.latest_device||'').toLowerCase().includes(q)
   ) : base;
   renderGames(filtered);
 }
