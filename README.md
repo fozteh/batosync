@@ -131,6 +131,72 @@ This should show an empty game list (since nothing has synced yet). If it works,
 
 ---
 
+## Part 3 — Setting up a MuOS Device (e.g. Anbernic RG40XXV)
+
+MuOS is supported. You need SSH access — enable it first under **Configuration → Web Services → SFTP + Filebrowser → Enabled**.
+
+- **SSH user:** `muos` &nbsp; **Password:** `muos` &nbsp; **Port:** `2022`
+
+### Step 1 — Create directories
+
+```bash
+ssh -p 2022 muos@<device-ip>
+mkdir -p /mnt/mmc/MUOS/bin /mnt/mmc/MUOS/log
+```
+
+### Step 2 — Copy the client files
+
+```bash
+scp -P 2022 client/batosync.sh muos@<device-ip>:/mnt/mmc/MUOS/bin/batosync.sh
+```
+
+### Step 3 — Create the configuration file
+
+SSH in and create the config:
+
+```bash
+cat > /mnt/mmc/MUOS/batosync.conf << 'EOF'
+export BATOSYNC_SERVER="http://192.168.1.100:5000"
+export BATOSYNC_KEY="change_me_to_a_secret_passphrase"
+export BATOSYNC_DEVICE="my-rg40xxv"
+export BATOSYNC_SAVES="/mnt/mmc/MUOS/save"
+export BATOSYNC_LOG="/mnt/mmc/MUOS/log/batosync.log"
+EOF
+```
+
+### Step 4 — Make the script executable
+
+```bash
+chmod +x /mnt/mmc/MUOS/bin/batosync.sh
+```
+
+### Step 5 — Test it
+
+```bash
+/mnt/mmc/MUOS/bin/batosync.sh --list
+```
+
+If that shows your games, run a full sync:
+
+```bash
+/mnt/mmc/MUOS/bin/batosync.sh --pull
+```
+
+### Automatic sync on MuOS
+
+MuOS uses a different event system to Batocera. The `gameStart.sh` and `gameStop.sh` scripts are not currently wired up automatically on MuOS — run a manual sync over SSH when switching devices:
+
+```bash
+/mnt/mmc/MUOS/bin/batosync.sh
+```
+
+> **MuOS save locations** — saves are stored under `/mnt/mmc/MUOS/save/` organised by emulator:
+> - Save states: `/mnt/mmc/MUOS/save/state/<emulator>/`
+> - Memory cards: `/mnt/mmc/MUOS/save/file/<emulator>/`
+> - PSP saves: `/mnt/mmc/MUOS/save/psp/PSP/SAVEDATA/`
+
+---
+
 ## Adding a new device
 
 When setting up BatoSync on a device for the first time, always **pull before you play**. This downloads all existing saves from the server so the device starts fully in sync:
