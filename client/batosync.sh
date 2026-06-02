@@ -8,6 +8,7 @@
 #    batosync.sh --push           # push local saves to server only
 #    batosync.sh --pull           # pull latest saves from server
 #    batosync.sh --dry-run        # show what would sync, no changes
+#    batosync.sh --force          # override sanity check (e.g. intentional blank server)
 #    batosync.sh --game "Zelda"   # sync a specific game only
 #    batosync.sh --list           # list games on the server
 #    batosync.sh --status         # show server save status
@@ -18,7 +19,7 @@
 
 set -euo pipefail
 
-VERSION="3.0.0 (2026-05-29)"
+VERSION="3.1.0 (2026-05-29)"
 
 # ── Load config from first location found ─────────────────────────
 for _conf in \
@@ -39,6 +40,11 @@ LOG_FILE="${BATOSYNC_LOG:-/userdata/system/logs/batosync.log}"
 EXCLUDE_DIRS="${BATOSYNC_EXCLUDE_DIRS:-}"
 # Conflict behaviour: warn (push anyway with warning) | skip (keep server version)
 CONFLICT_BEHAVIOR="${BATOSYNC_CONFLICT:-warn}"
+# Where to store timestamped backups of local saves
+BACKUP_BASE="${SAVES_DIR}/.batosync_backups"
+BACKUP_KEEP=3   # number of full backups to retain
+# File tracking last known server game count for sanity checks
+STATE_FILE="${LOG_FILE%.log}.state"
 # ──────────────────────────────────────────────────────────────────
 
 RED='\033[0;31m'
@@ -50,6 +56,7 @@ NC='\033[0m'
 MODE="sync"
 FILTER_GAME=""
 DRY_RUN=false
+FORCE=false
 
 log() { echo -e "$1" | tee -a "$LOG_FILE"; }
 info()    { log "${CYAN}[INFO]${NC}  $1"; }
@@ -74,6 +81,7 @@ while [[ $# -gt 0 ]]; do
         --list)     MODE="list";    shift ;;
         --status)   MODE="status";  shift ;;
         --dry-run)  DRY_RUN=true;   shift ;;
+        --force)    FORCE=true;     shift ;;
         --game)     FILTER_GAME="$2"; shift 2 ;;
         --help|-h)
             grep '^#  ' "$0" | sed 's/^#  //'
@@ -118,9 +126,64 @@ is_excluded() {
 # grep exits 1 when no files match the filter (e.g. fresh device with only .txt files)
 # || true prevents set -euo pipefail from killing the script in that case
 find_saves() {
-    find "$SAVES_DIR" -type f ! -name "*.batosync_backup" \
+    find "$SAVES_DIR" -type f \
+        ! -name "*.batosync_backup" \
+        ! -path "*/.batosync_backups/*" \
         | grep -viE '\.(png|jpg|jpeg|gif|bmp|webp|tif|tiff|svg|mp4|mkv|avi|mov|mp3|ogg|flac|wav|xml|txt|nfo|pdf)$' \
         || true
+}
+
+# ── Sanity check: abort if server looks empty vs last known state ──
+sanity_check() {
+    local server_count last_count=0
+    server_count=$(api_json GET /games 2>/dev/null | python3 -c "
+import json,sys
+data=json.load(sys.stdin)
+print(len(data.get('games',[])))
+" 2>/dev/null) || server_count=0
+
+    [[ -f "$STATE_FILE" ]] && last_count=$(cat "$STATE_FILE" 2>/dev/null || echo 0)
+    last_count=${last_count:-0}
+
+    # Update stored count
+    echo "$server_count" > "$STATE_FILE" 2>/dev/null || true
+
+    # Warn if server count dropped to less than half of what we last saw
+    # and we previously had a meaningful number of saves
+    if [[ $last_count -gt 10 && $server_count -lt $(( last_count / 2 )) ]]; then
+        warn "⚠ Server game count dropped from $last_count to $server_count"
+        if [[ "$FORCE" != "true" ]]; then
+            error "Pull aborted — server may be blank or misconfigured."
+            error "If intentional, re-run with --force to override."
+            return 1
+        fi
+        warn "Proceeding anyway (--force)"
+    fi
+    return 0
+}
+
+# ── Timestamped backup of all local saves ─────────────────────────
+backup_saves() {
+    [[ "$DRY_RUN" == "true" ]] && return 0
+    local ts backup_path
+    ts=$(date +%Y%m%d_%H%M%S)
+    backup_path="${BACKUP_BASE}/${ts}"
+    mkdir -p "$backup_path"
+    info "Backing up local saves to $backup_path ..."
+    find "$SAVES_DIR" -maxdepth 1 -mindepth 1 \
+        ! -name ".batosync_backups" \
+        ! -name "*.batosync_backup" | while read -r item; do
+        cp -a "$item" "$backup_path/" 2>/dev/null || true
+    done
+    # Prune oldest backups beyond BACKUP_KEEP
+    local count
+    count=$(ls -1 "$BACKUP_BASE" 2>/dev/null | wc -l)
+    if [[ $count -gt $BACKUP_KEEP ]]; then
+        ls -1t "$BACKUP_BASE" | tail -n +$(( BACKUP_KEEP + 1 )) | while read -r old; do
+            rm -rf "${BACKUP_BASE:?}/${old}"
+        done
+    fi
+    success "Backup complete (keeping last $BACKUP_KEEP)"
 }
 
 # Check server is reachable
@@ -260,6 +323,14 @@ print(s['device'] if s else '')
 pull_saves() {
     info "Pulling latest saves from server..."
     local pulled=0 skipped=0
+
+    # Sanity check — aborts if server looks blank vs last known state
+    sanity_check || return 1
+
+    # Full backup only on non-game-specific pulls (not during game launch)
+    if [[ -z "$FILTER_GAME" ]]; then
+        backup_saves
+    fi
 
     games_json=$(api_json GET /games 2>/dev/null || echo '{}')
     games=$(echo "$games_json" | python3 -c "
