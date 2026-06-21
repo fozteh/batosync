@@ -58,7 +58,10 @@ FILTER_GAME=""
 DRY_RUN=false
 FORCE=false
 
-log() { echo -e "$1" | tee -a "$LOG_FILE"; }
+log() {
+    echo -e "$1"
+    echo -e "$1" | sed "s/$(printf '\033')\[[0-9;]*m//g" >> "$LOG_FILE"
+}
 info()    { log "${CYAN}[INFO]${NC}  $1"; }
 success() { log "${GREEN}[OK]${NC}    $1"; }
 warn()    { log "${YELLOW}[WARN]${NC}  $1"; }

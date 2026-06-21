@@ -364,3 +364,42 @@ batosync/
 ```
 
 Save data on the server is stored in a Docker named volume (`batosync_data`) so it persists across container restarts and updates.
+
+---
+
+## Cheat Sheet
+
+### Make all scripts executable (one line)
+```bash
+chmod +x /userdata/scripts/batosync.sh /userdata/system/scripts/gameStart.sh /userdata/system/scripts/gameStop.sh /userdata/system/autostart.sh
+```
+
+### Fix BOM / Windows line endings on all files (one line)
+```bash
+for f in /userdata/scripts/batosync.sh /userdata/system/scripts/gameStart.sh /userdata/system/scripts/gameStop.sh /userdata/system/autostart.sh /userdata/system/batosync.conf; do sed -i '1s/^\xEF\xBB\xBF//' "$f"; done
+```
+
+### File locations on device
+| File | Location |
+|---|---|
+| `batosync.sh` | `/userdata/scripts/batosync.sh` |
+| `batosync.conf` | `/userdata/system/batosync.conf` |
+| `gameStart.sh` | `/userdata/system/scripts/gameStart.sh` |
+| `gameStop.sh` | `/userdata/system/scripts/gameStop.sh` |
+| `autostart.sh` | `/userdata/system/autostart.sh` |
+| Log file | `/userdata/system/logs/batosync.log` |
+
+### Useful commands
+```bash
+# View the log
+cat /userdata/system/logs/batosync.log
+
+# Test connection and list games on server
+/userdata/scripts/batosync.sh --list
+
+# Manual full sync
+/userdata/scripts/batosync.sh
+
+# Test game stop hook manually
+bash /userdata/system/scripts/gameStop.sh gameStop snes libretro snes9x "/userdata/roms/snes/mygame.sfc"
+```
