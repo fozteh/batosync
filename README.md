@@ -86,11 +86,17 @@ Do these steps on **every** Batocera device you want to sync.
 Connect to your Batocera device over SSH or via the file manager and copy these files:
 
 ```bash
-scp client/batosync.sh  root@192.168.1.50:/userdata/scripts/
-scp client/gameStart.sh  root@192.168.1.50:/userdata/scripts/
-scp client/gameStop.sh   root@192.168.1.50:/userdata/scripts/
-scp client/autostart.sh  root@192.168.1.50:/userdata/system/autostart.sh
+# Main sync script and config
+scp client/batosync.sh   root@192.168.1.50:/userdata/scripts/
 scp client/batosync.conf root@192.168.1.50:/userdata/system/
+
+# Game event hooks — must go in /userdata/system/scripts/ (not /userdata/scripts/)
+ssh root@192.168.1.50 "mkdir -p /userdata/system/scripts"
+scp client/gameStart.sh  root@192.168.1.50:/userdata/system/scripts/
+scp client/gameStop.sh   root@192.168.1.50:/userdata/system/scripts/
+
+# Boot sync (optional)
+scp client/autostart.sh  root@192.168.1.50:/userdata/system/autostart.sh
 ```
 
 The default SSH password for Batocera is `linux`.
@@ -114,7 +120,7 @@ export BATOSYNC_DEVICE="living-room-pi"              # a friendly name for THIS 
 ### Step 3 — Make the scripts executable
 
 ```bash
-ssh root@192.168.1.50 "chmod +x /userdata/scripts/batosync.sh /userdata/scripts/gameStart.sh /userdata/scripts/gameStop.sh /userdata/system/autostart.sh"
+ssh root@192.168.1.50 "chmod +x /userdata/scripts/batosync.sh /userdata/system/scripts/gameStart.sh /userdata/system/scripts/gameStop.sh /userdata/system/autostart.sh"
 ```
 
 ### Step 4 — Test it
@@ -237,20 +243,25 @@ After that first pull, just play normally — saves will push to the server when
 
 ### Automatic sync on game launch/close
 
-Copy the provided scripts and they will trigger automatically — no extra configuration needed.
+Batocera automatically calls all scripts in `/userdata/system/scripts/` on every game event — no extra configuration needed.
 
 ```bash
+# Create the scripts directory if it doesn't exist
+ssh root@192.168.1.50 "mkdir -p /userdata/system/scripts"
+
 # Copy auto-sync scripts
-scp client/gameStart.sh root@192.168.1.50:/userdata/scripts/
-scp client/gameStop.sh  root@192.168.1.50:/userdata/scripts/
+scp client/gameStart.sh root@192.168.1.50:/userdata/system/scripts/
+scp client/gameStop.sh  root@192.168.1.50:/userdata/system/scripts/
 
 # Make them executable
-ssh root@192.168.1.50 "chmod +x /userdata/scripts/gameStart.sh /userdata/scripts/gameStop.sh"
+ssh root@192.168.1.50 "chmod +x /userdata/system/scripts/gameStart.sh /userdata/system/scripts/gameStop.sh"
 ```
+
+> **Important:** these scripts must go in `/userdata/system/scripts/`, not `/userdata/scripts/`. Batocera's EmulationStation only watches the `system/scripts/` directory for game events.
 
 What each script does:
 
-- **gameStart.sh** — Batocera calls this just before launching a game. It pulls the latest save for that specific game from the server in the background, so the game launches immediately without waiting.
+- **gameStart.sh** — Batocera calls this just before launching a game. It pulls the latest save for that specific game from the server so you always start with the most recent progress.
 - **gameStop.sh** — Batocera calls this when you quit a game. It waits 3 seconds (so the emulator finishes writing), then pushes your fresh save up to the server.
 
 ### Automatic sync on boot
@@ -327,6 +338,9 @@ Logs are written on each Batocera device at:
 | Saves not appearing | Check `/userdata/saves/` contains `.srm`, `.sav`, or `.state` files |
 | Duplicate syncs | Normal — the script detects identical checksums and skips them |
 | Want more/fewer backups | Change `MAX_BACKUPS=20` in `docker-compose.yml` and restart |
+| gameStart/gameStop not triggering | Scripts must be in `/userdata/system/scripts/`, not `/userdata/scripts/` |
+| Scripts fail with `[[: not found` | Run with `bash script.sh`, not `sh script.sh` — or check for Windows line endings (CRLF) with `file script.sh` and fix with `dos2unix script.sh` |
+| Config file causes `﻿#: command not found` | BOM in config file — fix with `sed -i '1s/^\xEF\xBB\xBF//' /userdata/system/batosync.conf` |
 
 ---
 

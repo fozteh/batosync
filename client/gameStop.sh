@@ -1,25 +1,30 @@
-﻿#!/bin/bash
+#!/bin/bash
 # ─────────────────────────────────────────────────────────────
 #  BatoSync — gameStop.sh
-#  Batocera calls this automatically after a game closes.
-#  It pushes your fresh save up to the server.
+#  Batocera calls all scripts in /userdata/system/scripts/ on
+#  every game event. This script pushes the save when a game stops.
 #
-#  Install: copy to /userdata/scripts/gameStop.sh
-#           chmod +x /userdata/scripts/gameStop.sh
+#  Install: copy to /userdata/system/scripts/gameStop.sh
+#           chmod +x /userdata/system/scripts/gameStop.sh
 #
 #  Batocera passes these arguments:
-#    $1 = system  (e.g. "snes", "nes", "psx")
-#    $2 = emulator
-#    $3 = rom path
-#    $4 = rom name (no extension)
+#    $1 = event type (gameStart or gameStop)
+#    $2 = system  (e.g. "snes", "nes", "psx")
+#    $3 = emulator
+#    $4 = core
+#    $5 = rom path (full path)
 # ─────────────────────────────────────────────────────────────
 
-VERSION="1.2.0 (2026-05-29)"
+[[ "$1" != "gameStop" ]] && exit 0
 
-SYSTEM="$1"
-EMULATOR="$2"
-ROM_PATH="$3"
-ROM_NAME="$4"
+VERSION="1.3.0 (2026-06-21)"
+
+SYSTEM="$2"
+EMULATOR="$3"
+CORE="$4"
+ROM_PATH="$5"
+ROM_NAME=$(basename "$ROM_PATH")
+ROM_NAME="${ROM_NAME%.*}"
 
 # Load config from first location found
 for _conf in "/userdata/system/batosync.conf" "/mnt/mmc/MUOS/batosync.conf" \
@@ -35,6 +40,7 @@ for _s in "/userdata/scripts/batosync.sh" "/mnt/mmc/MUOS/bin/batosync.sh" \
 done
 SYNC_SCRIPT="${SYNC_SCRIPT:-/userdata/scripts/batosync.sh}"
 LOG="${BATOSYNC_LOG:-/userdata/system/logs/batosync.log}"
+mkdir -p "$(dirname "$LOG")" 2>/dev/null || true
 
 echo "" >> "$LOG"
 echo "[GAME STOP]  $(date '+%Y-%m-%d %H:%M:%S') — $SYSTEM / $ROM_NAME" >> "$LOG"
@@ -53,6 +59,7 @@ fi
 sleep 3
 
 # Push the save for the game that just closed
-"$SYNC_SCRIPT" --push --game "${SYSTEM}_${ROM_NAME}" >> "$LOG" 2>&1
+# batosync.sh writes its own log via tee — redirect stdout to /dev/null to avoid duplicates
+"$SYNC_SCRIPT" --push --game "${SYSTEM}_${ROM_NAME}" > /dev/null 2>> "$LOG"
 
 exit 0
