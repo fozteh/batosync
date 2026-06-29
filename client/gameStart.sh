@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────
 #  BatoSync — gameStart.sh
 #  Batocera calls all scripts in /userdata/system/scripts/ on

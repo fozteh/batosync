@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────
 #  BatoSync — muos-init.sh
 #  Runs once at MuOS boot. Pulls all latest saves from the

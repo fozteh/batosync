@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────
 #  BatoSync — muos-content-load.sh
 #  Called by MuOS just before a game launches. Pulls the latest

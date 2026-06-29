@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+﻿#!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────
 #  BatoSync Client — syncs Batocera save files with a central
 #  BatoSync Docker server.

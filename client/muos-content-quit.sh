@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────
 #  BatoSync — muos-content-quit.sh
 #  Called by MuOS after a game exits. Pushes the save up to
