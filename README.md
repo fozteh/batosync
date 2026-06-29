@@ -413,6 +413,8 @@ Logs are written on each Batocera device at:
 | Want more/fewer backups | Change `MAX_BACKUPS=20` in `docker-compose.yml` and restart |
 | gameStart/gameStop not triggering | Scripts must be in `/userdata/system/scripts/`, not `/userdata/scripts/` |
 | MuOS hooks not triggering | Check the two lines were added to `/opt/muos/script/mux/launch.sh` (a firmware update may have restored it); confirm `/mnt/mmc/MUOS/hook/content-load.sh` and `content-quit.sh` are executable |
+| MuOS: `#!/bin/bash: not found` or `syntax error: unexpected redirection` | CRLF line endings in a script copied from Windows — run `sed -i 's/\r$//' /mnt/mmc/MUOS/bin/batosync.sh` (and the hook scripts) |
+| MuOS: `#: not found` when sourcing config | UTF-8 BOM in `batosync.conf` — run `sed -i '1s/^\xEF\xBB\xBF//' /mnt/mmc/MUOS/batosync.conf` |
 | Scripts fail with `[[: not found` | Run with `bash script.sh`, not `sh script.sh` — or check for Windows line endings (CRLF) with `file script.sh` and fix with `dos2unix script.sh` |
 | Config file causes `﻿#: command not found` | BOM in config file — fix with `sed -i '1s/^\xEF\xBB\xBF//' /userdata/system/batosync.conf` |
 
@@ -489,6 +491,19 @@ cat /userdata/system/logs/batosync.log
 
 # Test game stop hook manually
 bash /userdata/system/scripts/gameStop.sh gameStop snes libretro snes9x "/userdata/roms/snes/mygame.sfc"
+```
+
+### Fix CRLF line endings — MuOS (run on device after copying files from Windows)
+```bash
+for f in /mnt/mmc/MUOS/bin/batosync.sh \
+          /mnt/mmc/MUOS/hook/content-load.sh \
+          /mnt/mmc/MUOS/hook/content-quit.sh \
+          /mnt/mmc/MUOS/init/batosync.sh \
+          /mnt/mmc/MUOS/batosync.conf; do
+    sed -i 's/\r$//' "$f"
+done
+# Also strip BOM from config if present
+sed -i '1s/^\xEF\xBB\xBF//' /mnt/mmc/MUOS/batosync.conf
 ```
 
 ### Useful commands — MuOS
