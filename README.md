@@ -156,6 +156,12 @@ mkdir -p /mnt/mmc/MUOS/bin /mnt/mmc/MUOS/log
 scp -P 2022 client/batosync.sh muos@<device-ip>:/mnt/mmc/MUOS/bin/batosync.sh
 ```
 
+> **If you're copying from Windows**, strip the CRLF line endings immediately after each scp — otherwise the bash shebang breaks:
+> ```bash
+> ssh -p 2022 muos@<device-ip> "sed -i 's/\r\$//' /mnt/mmc/MUOS/bin/batosync.sh"
+> ```
+> The same applies to every script you copy (hook scripts, init script). The cheat sheet at the bottom has a one-liner that fixes all of them at once.
+
 ### Step 3 — Create the configuration file
 
 SSH in and create the config:
