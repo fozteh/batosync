@@ -27,14 +27,14 @@ ROM_NAME=$(basename "$ROM_PATH")
 ROM_NAME="${ROM_NAME%.*}"
 
 # Load config from first location found
-for _conf in "/userdata/system/batosync.conf" "/mnt/mmc/MUOS/batosync.conf" \
+for _conf in "/userdata/system/batosync.conf" \
              "$(dirname "$0")/batosync.conf" "$HOME/batosync.conf"; do
     [[ -f "$_conf" ]] && source "$_conf" && break
 done
 
 # Find sync script
 SYNC_SCRIPT=""
-for _s in "/userdata/scripts/batosync.sh" "/mnt/mmc/MUOS/bin/batosync.sh" \
+for _s in "/userdata/scripts/batosync.sh" \
           "$(dirname "$0")/batosync.sh"; do
     [[ -x "$_s" ]] && SYNC_SCRIPT="$_s" && break
 done
