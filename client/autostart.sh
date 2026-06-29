@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────
 #  BatoSync — autostart.sh
 #  Runs once at Batocera boot. Pulls all latest saves from the
