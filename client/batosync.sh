@@ -24,7 +24,6 @@ VERSION="3.1.0 (2026-05-29)"
 # ── Load config from first location found ─────────────────────────
 for _conf in \
     "/userdata/system/batosync.conf" \
-    "/opt/retropie/configs/all/batosync.conf" \
     "$(dirname "$0")/batosync.conf" \
     "$HOME/batosync.conf"; do
     [[ -f "$_conf" ]] && source "$_conf" && break

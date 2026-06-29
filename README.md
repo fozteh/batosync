@@ -137,91 +137,6 @@ This should show an empty game list (since nothing has synced yet). If it works,
 
 ---
 
-## Part 3 — Setting up a RetroPie Device
-
-RetroPie runs on standard Debian/Raspberry Pi OS, so there are no CRLF or shebang quirks. Save file naming matches Batocera's convention (`snes_game.srm`) so cross-device sync between the two platforms works out of the box.
-
-SSH defaults: **user** `pi` · **password** `raspberry` · **port** `22`
-
-### Step 1 — Create directories
-
-```bash
-ssh pi@<device-ip>
-mkdir -p ~/RetroPie/scripts ~/RetroPie/logs
-mkdir -p /opt/retropie/configs/all/emulationstation/scripts
-```
-
-### Step 2 — Copy the client files
-
-```bash
-# Main sync script
-scp client/batosync.sh pi@<device-ip>:/home/pi/RetroPie/scripts/batosync.sh
-
-# Configuration
-scp client/batosync.conf pi@<device-ip>:/opt/retropie/configs/all/batosync.conf
-
-# Game event hooks (RetroPie-specific scripts)
-scp client/retropie-gamestart.sh pi@<device-ip>:/opt/retropie/configs/all/emulationstation/scripts/batosync-gamestart.sh
-scp client/retropie-gamestop.sh  pi@<device-ip>:/opt/retropie/configs/all/emulationstation/scripts/batosync-gamestop.sh
-
-# Boot sync (optional)
-scp client/autostart.sh pi@<device-ip>:/opt/retropie/configs/all/autostart.sh
-```
-
-### Step 3 — Edit the configuration file
-
-```bash
-ssh pi@<device-ip>
-nano /opt/retropie/configs/all/batosync.conf
-```
-
-Change these values — note the RetroPie saves path:
-
-```bash
-export BATOSYNC_SERVER="http://192.168.1.100:5000"
-export BATOSYNC_KEY="change_me_to_a_secret_passphrase"
-export BATOSYNC_DEVICE="retropie-bedroom"
-export BATOSYNC_SAVES="/home/pi/RetroPie/saves"
-export BATOSYNC_LOG="/home/pi/RetroPie/logs/batosync.log"
-```
-
-### Step 4 — Make the scripts executable
-
-```bash
-ssh pi@<device-ip> "chmod +x /home/pi/RetroPie/scripts/batosync.sh \
-  /opt/retropie/configs/all/emulationstation/scripts/batosync-gamestart.sh \
-  /opt/retropie/configs/all/emulationstation/scripts/batosync-gamestop.sh \
-  /opt/retropie/configs/all/autostart.sh"
-```
-
-### Step 5 — Test it
-
-```bash
-/home/pi/RetroPie/scripts/batosync.sh --list
-```
-
-If that shows your games, run a pull:
-
-```bash
-/home/pi/RetroPie/scripts/batosync.sh --pull
-```
-
-### Step 6 — Test the hooks
-
-Test the game-stop hook manually with a fake event:
-
-```bash
-bash /opt/retropie/configs/all/emulationstation/scripts/batosync-gamestop.sh \
-  game-end snes retroarch /home/pi/RetroPie/roms/snes/mygame.sfc
-cat /home/pi/RetroPie/logs/batosync.log
-```
-
-You should see a `[GAME STOP]` entry and a successful push.
-
-> **RetroPie save location:** saves live at `/home/pi/RetroPie/saves/<system>/` — the same `<system>` folder names RetroArch uses (e.g. `snes`, `nes`, `psx`). This matches Batocera's convention, so saves are immediately cross-compatible between the two platforms.
-
----
-
 ## Adding a new device
 
 When setting up BatoSync on a device for the first time, always **pull before you play**. This downloads all existing saves from the server so the device starts fully in sync:
@@ -357,11 +272,9 @@ Logs are written on each Batocera device at:
 | Saves not appearing | Check `/userdata/saves/` contains `.srm`, `.sav`, or `.state` files |
 | Duplicate syncs | Normal — the script detects identical checksums and skips them |
 | Want more/fewer backups | Change `MAX_BACKUPS=20` in `docker-compose.yml` and restart |
-| gameStart/gameStop not triggering (Batocera) | Scripts must be in `/userdata/system/scripts/`, not `/userdata/scripts/` |
-| gamestart/gamestop not triggering (RetroPie) | Scripts must be in `/opt/retropie/configs/all/emulationstation/scripts/` and executable |
-| RetroPie hooks fire but event check fails | Confirm ES is calling with `game-start`/`game-end` — test by logging `$1` in the script |
+| gameStart/gameStop not triggering | Scripts must be in `/userdata/system/scripts/`, not `/userdata/scripts/` |
 | Scripts fail with `[[: not found` | Run with `bash script.sh`, not `sh script.sh` |
-| Config file causes `#: command not found` | BOM in config file — fix with `sed -i '1s/^\xEF\xBB\xBF//' <path-to-conf>` |
+| Config file causes `#: command not found` | BOM in config file — fix with `sed -i '1s/^\xEF\xBB\xBF//' /userdata/system/batosync.conf` |
 
 ---
 
@@ -379,11 +292,9 @@ batosync/
 └── client/
     ├── batosync.sh                ← main sync script (copy to each device)
     ├── batosync.conf              ← configuration template
-    ├── gameStart.sh               ← Batocera: auto-pull on game launch
-    ├── gameStop.sh                ← Batocera: auto-push on game quit
-    ├── retropie-gamestart.sh      ← RetroPie: auto-pull on game launch
-    ├── retropie-gamestop.sh       ← RetroPie: auto-push on game quit
-    └── autostart.sh               ← pull all saves at boot (Batocera + RetroPie)
+    ├── gameStart.sh               ← auto-pull when a game launches
+    ├── gameStop.sh                ← auto-push when a game closes
+    └── autostart.sh               ← pull all saves at boot
 ```
 
 Save data on the server is stored in a Docker named volume (`batosync_data`) so it persists across container restarts and updates.
@@ -402,7 +313,7 @@ chmod +x /userdata/scripts/batosync.sh /userdata/system/scripts/gameStart.sh /us
 for f in /userdata/scripts/batosync.sh /userdata/system/scripts/gameStart.sh /userdata/system/scripts/gameStop.sh /userdata/system/autostart.sh /userdata/system/batosync.conf; do sed -i '1s/^\xEF\xBB\xBF//' "$f"; done
 ```
 
-### File locations — Batocera
+### File locations
 | File | Location |
 |---|---|
 | `batosync.sh` | `/userdata/scripts/batosync.sh` |
@@ -412,17 +323,7 @@ for f in /userdata/scripts/batosync.sh /userdata/system/scripts/gameStart.sh /us
 | `autostart.sh` | `/userdata/system/autostart.sh` |
 | Log file | `/userdata/system/logs/batosync.log` |
 
-### File locations — RetroPie
-| File | Location |
-|---|---|
-| `batosync.sh` | `/home/pi/RetroPie/scripts/batosync.sh` |
-| `batosync.conf` | `/opt/retropie/configs/all/batosync.conf` |
-| `retropie-gamestart.sh` | `/opt/retropie/configs/all/emulationstation/scripts/batosync-gamestart.sh` |
-| `retropie-gamestop.sh` | `/opt/retropie/configs/all/emulationstation/scripts/batosync-gamestop.sh` |
-| `autostart.sh` | `/opt/retropie/configs/all/autostart.sh` |
-| Log file | `/home/pi/RetroPie/logs/batosync.log` |
-
-### Useful commands — Batocera
+### Useful commands
 ```bash
 # View the log
 cat /userdata/system/logs/batosync.log
@@ -435,20 +336,4 @@ cat /userdata/system/logs/batosync.log
 
 # Test game stop hook manually
 bash /userdata/system/scripts/gameStop.sh gameStop snes libretro snes9x "/userdata/roms/snes/mygame.sfc"
-```
-
-### Useful commands — RetroPie
-```bash
-# View the log
-cat /home/pi/RetroPie/logs/batosync.log
-
-# Test connection and list games on server
-/home/pi/RetroPie/scripts/batosync.sh --list
-
-# Manual full sync
-/home/pi/RetroPie/scripts/batosync.sh
-
-# Test game stop hook manually
-bash /opt/retropie/configs/all/emulationstation/scripts/batosync-gamestop.sh \
-  game-end snes retroarch /home/pi/RetroPie/roms/snes/mygame.sfc
 ```
