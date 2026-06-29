@@ -176,7 +176,7 @@ EOF
 chmod +x /mnt/mmc/MUOS/bin/batosync.sh
 ```
 
-### Step 5 — Test it
+### Step 5 — Test the sync script
 
 ```bash
 /mnt/mmc/MUOS/bin/batosync.sh --list
@@ -188,13 +188,86 @@ If that shows your games, run a full sync:
 /mnt/mmc/MUOS/bin/batosync.sh --pull
 ```
 
-### Automatic sync on MuOS
+### Step 6 — Wire up automatic sync on game launch/quit
 
-MuOS uses a different event system to Batocera. The `gameStart.sh` and `gameStop.sh` scripts are not currently wired up automatically on MuOS — run a manual sync over SSH when switching devices:
+MuOS runs all content through `/opt/muos/script/mux/launch.sh`. It already has `LAUNCH_PREP` and `LAUNCH_DONE` hook points but they're set per-system via INI files. The cleanest way to inject BatoSync without editing dozens of INI files is to add two lines to `launch.sh` that call user hook scripts from the SD card if they exist.
+
+**6a — Patch launch.sh** (one-time edit, ~30 seconds):
 
 ```bash
-/mnt/mmc/MUOS/bin/batosync.sh
+ssh -p 2022 muos@<device-ip>
 ```
+
+Open the file:
+```bash
+vi /opt/muos/script/mux/launch.sh
+```
+
+Find this block (it's near the bottom of the `else` branch):
+```sh
+        [ -n "$LAUNCH_PREP" ] && "$LAUNCH_PREP" "$NAME" "$CORE" "$ROM"
+
+        [ "${USE_ACTIVITY:-0}" -eq 1 ] && /opt/muos/script/mux/track.sh "$NAME" "$CORE" "$ROM" start
+        "$LAUNCH_EXEC" "$NAME" "$CORE" "$ROM"
+        [ "${USE_ACTIVITY:-0}" -eq 1 ] && /opt/muos/script/mux/track.sh "$NAME" "$CORE" "$ROM" stop
+
+        [ -n "$LAUNCH_DONE" ] && "$LAUNCH_DONE" "$NAME" "$CORE" "$ROM"
+```
+
+Add the two BatoSync lines (marked with `# ← add`):
+```sh
+        [ -n "$LAUNCH_PREP" ] && "$LAUNCH_PREP" "$NAME" "$CORE" "$ROM"
+        [ -x "/mnt/mmc/MUOS/hook/content-load.sh" ] && /mnt/mmc/MUOS/hook/content-load.sh "$NAME" "$CORE" "$ROM"  # ← add
+
+        [ "${USE_ACTIVITY:-0}" -eq 1 ] && /opt/muos/script/mux/track.sh "$NAME" "$CORE" "$ROM" start
+        "$LAUNCH_EXEC" "$NAME" "$CORE" "$ROM"
+        [ "${USE_ACTIVITY:-0}" -eq 1 ] && /opt/muos/script/mux/track.sh "$NAME" "$CORE" "$ROM" stop
+
+        [ -n "$LAUNCH_DONE" ] && "$LAUNCH_DONE" "$NAME" "$CORE" "$ROM"
+        [ -x "/mnt/mmc/MUOS/hook/content-quit.sh" ] && /mnt/mmc/MUOS/hook/content-quit.sh "$NAME" "$CORE" "$ROM"  # ← add
+```
+
+> **After a MuOS firmware update** this file may be restored to its original. Just re-add these two lines. Everything else (your hook scripts, config, saves) is on the SD card and unaffected.
+
+**6b — Install the hook scripts:**
+
+```bash
+ssh -p 2022 muos@<device-ip> "mkdir -p /mnt/mmc/MUOS/hook"
+scp -P 2022 client/muos-content-load.sh muos@<device-ip>:/mnt/mmc/MUOS/hook/content-load.sh
+scp -P 2022 client/muos-content-quit.sh muos@<device-ip>:/mnt/mmc/MUOS/hook/content-quit.sh
+ssh -p 2022 muos@<device-ip> "chmod +x /mnt/mmc/MUOS/hook/content-load.sh /mnt/mmc/MUOS/hook/content-quit.sh"
+```
+
+What each script does:
+
+- **content-load.sh** — runs just before the emulator launches. Pulls the save for that specific game so you always start with the latest progress.
+- **content-quit.sh** — runs after the emulator exits. Waits 3 seconds for filesystem flush, then pushes your save up to the server.
+
+Both scripts extract the system name from the ROM's parent directory (e.g. `/mnt/mmc/roms/SNES/` → `snes`, lowercased) and the game name from the filename — matching the same key convention BatoSync uses on Batocera so saves stay in sync across both platforms.
+
+### Step 7 — Install the boot sync (optional)
+
+To pull all saves when the device powers on:
+
+```bash
+ssh -p 2022 muos@<device-ip> "mkdir -p /mnt/mmc/MUOS/init"
+scp -P 2022 client/muos-init.sh muos@<device-ip>:/mnt/mmc/MUOS/init/batosync.sh
+ssh -p 2022 muos@<device-ip> "chmod +x /mnt/mmc/MUOS/init/batosync.sh"
+```
+
+MuOS runs all scripts in `/mnt/mmc/MUOS/init/` automatically at boot. This waits for the network (up to 30 seconds) then pulls all saves in the background while the UI loads.
+
+### Step 8 — Test the hooks
+
+Test the quit hook manually with a fake ROM path:
+
+```bash
+ssh -p 2022 muos@<device-ip>
+sh /mnt/mmc/MUOS/hook/content-quit.sh "Super Mario World" "lr-snes9x" "/mnt/mmc/roms/SNES/Super Mario World.sfc"
+cat /mnt/mmc/MUOS/log/batosync.log
+```
+
+You should see a `[GAME STOP]` entry and a successful push in the log.
 
 > **MuOS save locations** — saves are stored under `/mnt/mmc/MUOS/save/` organised by emulator:
 > - Save states: `/mnt/mmc/MUOS/save/state/<emulator>/`
@@ -241,7 +314,7 @@ After that first pull, just play normally — saves will push to the server when
 /userdata/scripts/batosync.sh --game "Super Mario"
 ```
 
-### Automatic sync on game launch/close
+### Automatic sync on game launch/close (Batocera)
 
 Batocera automatically calls all scripts in `/userdata/system/scripts/` on every game event — no extra configuration needed.
 
@@ -339,6 +412,7 @@ Logs are written on each Batocera device at:
 | Duplicate syncs | Normal — the script detects identical checksums and skips them |
 | Want more/fewer backups | Change `MAX_BACKUPS=20` in `docker-compose.yml` and restart |
 | gameStart/gameStop not triggering | Scripts must be in `/userdata/system/scripts/`, not `/userdata/scripts/` |
+| MuOS hooks not triggering | Check the two lines were added to `/opt/muos/script/mux/launch.sh` (a firmware update may have restored it); confirm `/mnt/mmc/MUOS/hook/content-load.sh` and `content-quit.sh` are executable |
 | Scripts fail with `[[: not found` | Run with `bash script.sh`, not `sh script.sh` — or check for Windows line endings (CRLF) with `file script.sh` and fix with `dos2unix script.sh` |
 | Config file causes `﻿#: command not found` | BOM in config file — fix with `sed -i '1s/^\xEF\xBB\xBF//' /userdata/system/batosync.conf` |
 
@@ -356,11 +430,14 @@ batosync/
 │   └── templates/
 │       └── dashboard.html         ← web dashboard (served at :5000/)
 └── client/
-    ├── batosync.sh               ← main sync script (copy to each device)
-    ├── batosync.conf             ← configuration for each device
-    ├── gameStart.sh               ← auto-pull when a game launches
-    ├── gameStop.sh                ← auto-push when a game closes
-    └── autostart.sh               ← pull all saves at boot
+    ├── batosync.sh                ← main sync script (copy to each device)
+    ├── batosync.conf              ← configuration template
+    ├── gameStart.sh               ← Batocera: auto-pull on game launch
+    ├── gameStop.sh                ← Batocera: auto-push on game quit
+    ├── autostart.sh               ← Batocera: pull all saves at boot
+    ├── muos-content-load.sh       ← MuOS: auto-pull on game launch
+    ├── muos-content-quit.sh       ← MuOS: auto-push on game quit
+    └── muos-init.sh               ← MuOS: pull all saves at boot
 ```
 
 Save data on the server is stored in a Docker named volume (`batosync_data`) so it persists across container restarts and updates.
@@ -379,7 +456,7 @@ chmod +x /userdata/scripts/batosync.sh /userdata/system/scripts/gameStart.sh /us
 for f in /userdata/scripts/batosync.sh /userdata/system/scripts/gameStart.sh /userdata/system/scripts/gameStop.sh /userdata/system/autostart.sh /userdata/system/batosync.conf; do sed -i '1s/^\xEF\xBB\xBF//' "$f"; done
 ```
 
-### File locations on device
+### File locations — Batocera
 | File | Location |
 |---|---|
 | `batosync.sh` | `/userdata/scripts/batosync.sh` |
@@ -389,7 +466,17 @@ for f in /userdata/scripts/batosync.sh /userdata/system/scripts/gameStart.sh /us
 | `autostart.sh` | `/userdata/system/autostart.sh` |
 | Log file | `/userdata/system/logs/batosync.log` |
 
-### Useful commands
+### File locations — MuOS
+| File | Location |
+|---|---|
+| `batosync.sh` | `/mnt/mmc/MUOS/bin/batosync.sh` |
+| `batosync.conf` | `/mnt/mmc/MUOS/batosync.conf` |
+| `muos-content-load.sh` | `/mnt/mmc/MUOS/hook/content-load.sh` |
+| `muos-content-quit.sh` | `/mnt/mmc/MUOS/hook/content-quit.sh` |
+| `muos-init.sh` | `/mnt/mmc/MUOS/init/batosync.sh` |
+| Log file | `/mnt/mmc/MUOS/log/batosync.log` |
+
+### Useful commands — Batocera
 ```bash
 # View the log
 cat /userdata/system/logs/batosync.log
@@ -402,4 +489,22 @@ cat /userdata/system/logs/batosync.log
 
 # Test game stop hook manually
 bash /userdata/system/scripts/gameStop.sh gameStop snes libretro snes9x "/userdata/roms/snes/mygame.sfc"
+```
+
+### Useful commands — MuOS
+```bash
+# View the log
+cat /mnt/mmc/MUOS/log/batosync.log
+
+# Test connection and list games on server
+/mnt/mmc/MUOS/bin/batosync.sh --list
+
+# Manual full sync
+/mnt/mmc/MUOS/bin/batosync.sh
+
+# Find hook directory on device
+find /opt/muos -name "*.sh" 2>/dev/null | grep -iE "launch|quit|load|content|event"
+
+# Test quit hook manually
+sh /mnt/mmc/MUOS/hook/content-quit.sh "My Game" "lr-snes9x" "/mnt/mmc/roms/SNES/My Game.sfc"
 ```
