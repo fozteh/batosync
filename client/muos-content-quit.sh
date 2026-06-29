@@ -49,6 +49,6 @@ fi
 # this gives the filesystem a moment to flush save writes before we push
 sleep 3
 
-"$SYNC_SCRIPT" --push --game "${SYSTEM}_${ROM_NAME}" > /dev/null 2>> "$LOG"
+"$SYNC_SCRIPT" --push --game "${ROM_NAME}" > /dev/null 2>> "$LOG"
 
 exit 0

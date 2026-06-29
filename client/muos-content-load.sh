@@ -48,7 +48,7 @@ if [ -z "${BATOSYNC_SERVER:-}" ]; then
 fi
 
 printf '[GAME START] Checking for newer saves on server...\n' >> "$LOG"
-"$SYNC_SCRIPT" --pull --game "${SYSTEM}_${ROM_NAME}" > /dev/null 2>> "$LOG" || true
+"$SYNC_SCRIPT" --pull --game "${ROM_NAME}" > /dev/null 2>> "$LOG" || true
 printf '[GAME START] Save check complete — launching game\n' >> "$LOG"
 
 exit 0
