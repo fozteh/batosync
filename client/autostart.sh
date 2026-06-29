@@ -16,6 +16,7 @@ VERSION="1.2.0 (2026-05-29)"
 
 # Load config from first location found
 for _conf in "/userdata/system/batosync.conf" \
+             "/opt/retropie/configs/all/batosync.conf" \
              "$(dirname "$0")/batosync.conf" "$HOME/batosync.conf"; do
     [[ -f "$_conf" ]] && source "$_conf" && break
 done
@@ -23,6 +24,7 @@ done
 # Find sync script
 SYNC_SCRIPT=""
 for _s in "/userdata/scripts/batosync.sh" \
+          "/home/pi/RetroPie/scripts/batosync.sh" \
           "$(dirname "$0")/batosync.sh"; do
     [[ -x "$_s" ]] && SYNC_SCRIPT="$_s" && break
 done
@@ -33,7 +35,7 @@ mkdir -p "$(dirname "$LOG")"
 
 echo "" >> "$LOG"
 echo "═══════════════════════════════════" >> "$LOG"
-echo "[BOOT] $(date '+%Y-%m-%d %H:%M:%S') — Batocera starting" >> "$LOG"
+echo "[BOOT] $(date '+%Y-%m-%d %H:%M:%S') — System starting" >> "$LOG"
 
 if [[ ! -x "$SYNC_SCRIPT" ]]; then
     echo "[BOOT] batosync.sh not found — skipping boot sync" >> "$LOG"
