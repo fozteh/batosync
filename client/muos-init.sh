@@ -16,6 +16,7 @@ for _conf in "/mnt/mmc/MUOS/batosync.conf" "$HOME/batosync.conf"; do
     [[ -f "$_conf" ]] && source "$_conf" && break
 done
 
+
 SYNC_SCRIPT="/mnt/mmc/MUOS/bin/batosync.sh"
 LOG="${BATOSYNC_LOG:-/mnt/mmc/MUOS/log/batosync.log}"
 mkdir -p "$(dirname "$LOG")" 2>/dev/null || true

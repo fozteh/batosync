@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # ─────────────────────────────────────────────────────────────
 #  BatoSync — muos-content-quit.sh
 #  Called by MuOS after a game exits. Pushes the save up to
@@ -25,7 +25,7 @@ ROM_NAME=$(basename "$ROM")
 ROM_NAME="${ROM_NAME%.*}"
 
 for _conf in "/mnt/mmc/MUOS/batosync.conf" "$HOME/batosync.conf"; do
-    [ -f "$_conf" ] && . "$_conf" && break
+    [[ -f "$_conf" ]] && source "$_conf" && break
 done
 
 SYNC_SCRIPT="/mnt/mmc/MUOS/bin/batosync.sh"
